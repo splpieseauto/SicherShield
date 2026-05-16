@@ -2033,8 +2033,12 @@ textarea { resize: vertical; min-height: 80px; }
           <span class="tab-icon">🔵</span> Google Drive
           <span class="tab-badge" id="tab-gdrive-badge" style="display:none">ON</span>
         </button>
+        <button class="settings-tab tab-webdav" onclick="switchSettingsTab('webdav', this)">
+          <span class="tab-icon">🖥️</span> WebDAV NAS
+          <span class="tab-badge" id="tab-webdav-badge" style="display:none;background:var(--green)">✓</span>
+        </button>
         <button class="settings-tab tab-synology" onclick="switchSettingsTab('synology', this)">
-          <span class="tab-icon">🖥️</span> NAS Synology
+          <span class="tab-icon">🔧</span> Synology
         </button>
         <button class="settings-tab tab-github" onclick="switchSettingsTab('github', this)">
           <span class="tab-icon">🐙</span> GitHub
@@ -2131,7 +2135,85 @@ textarea { resize: vertical; min-height: 80px; }
 
       </div>
 
-      <!-- ══ TAB: NAS SYNOLOGY ══ -->
+      </div>
+
+      <!-- ══ TAB: WEBDAV NAS ══ -->
+      <div class="settings-panel" id="panel-webdav">
+
+        <!-- Status card -->
+        <div class="card" style="border-color:rgba(96,165,250,.3)">
+          <div class="card-title" style="color:var(--blue)">🖥️ Backup direct pe NAS prin WebDAV</div>
+          <div style="display:flex;align-items:center;gap:16px;padding:14px;background:var(--s3);border:1px solid var(--border);border-radius:8px;margin-bottom:0">
+            <span id="wdav-status-badge" style="font-size:24px">⚪</span>
+            <div style="flex:1">
+              <div id="wdav-status-text" style="font-size:14px;font-weight:600;color:var(--text3)">Neconfigurat</div>
+              <div style="font-size:12px;color:var(--text3);margin-top:2px">Ultimul backup: <span id="wdav-last-sync" style="font-family:var(--font-m)">—</span></div>
+            </div>
+            <button class="btn btn-sec btn-sm" onclick="webdavBackupNow().then(()=>{})" style="flex-shrink:0">⬆ Backup acum</button>
+          </div>
+        </div>
+
+        <!-- Config card -->
+        <div class="card">
+          <div class="card-title">⚙️ Configurare conexiune</div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">URL WebDAV NAS</label>
+              <input type="text" id="wdav-url" placeholder="https://nts2022.ddns.net:5006" style="font-family:var(--font-m);font-size:13px">
+              <div style="font-size:11px;color:var(--text3);margin-top:4px">DSM → Package Center → WebDAV Server → portul afișat acolo</div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Utilizator DSM</label>
+                <input type="text" id="wdav-user" placeholder="SicherShield" autocomplete="off">
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Parolă</label>
+                <input type="password" id="wdav-pass" placeholder="••••••••" autocomplete="off">
+              </div>
+            </div>
+
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="wdav-enabled" checked style="width:16px;height:16px;accent-color:var(--accent)">
+              <div>
+                <div style="font-size:14px;color:var(--text);font-weight:500">Backup automat activat</div>
+                <div style="font-size:12px;color:var(--text3);margin-top:2px">Salvează pe NAS automat după fiecare inspecție sau echipament modificat</div>
+              </div>
+            </label>
+
+            <div style="display:flex;gap:10px">
+              <button class="btn btn-primary" onclick="saveWebdavConfig()" style="flex:1">💾 Salvează configurarea</button>
+              <button class="btn btn-sec" onclick="webdavTest()" style="flex:1">🔌 Testează conexiunea</button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- How it works card -->
+        <div class="card">
+          <div class="card-title">ℹ️ Cum funcționează</div>
+          <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--text3);line-height:1.7">
+            <div style="display:flex;gap:12px;align-items:flex-start;padding:10px;background:var(--s3);border-radius:8px">
+              <span style="font-size:18px;flex-shrink:0">💾</span>
+              <div><strong style="color:var(--text)">Backup automat</strong> — după fiecare salvare (echipament sau inspecție), datele sunt trimise direct pe NAS în 2 secunde. Fișierul <code style="background:var(--bg);padding:1px 5px;border-radius:3px;font-family:var(--font-m);font-size:11px">/SicherShield/sicher_backup.json</code> e actualizat.</div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-start;padding:10px;background:var(--s3);border-radius:8px">
+              <span style="font-size:18px;flex-shrink:0">🔄</span>
+              <div><strong style="color:var(--text)">Restore automat</strong> — la deschiderea app-ului pe orice dispozitiv, se verifică dacă NAS-ul are date mai noi. Dacă da, sunt preluate automat.</div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-start;padding:10px;background:var(--s3);border-radius:8px">
+              <span style="font-size:18px;flex-shrink:0">📱</span>
+              <div><strong style="color:var(--text)">Multi-dispozitiv</strong> — salvezi pe telefon, deschizi pe laptop → datele sunt deja acolo. Fără cloud terț, totul pe NAS-ul tău.</div>
+            </div>
+            <div style="padding:10px 14px;background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.2);border-radius:8px;color:var(--yellow)">
+              ⚠️ <strong>CORS:</strong> Synology WebDAV permite implicit cereri din browser. Dacă primești eroare CORS, activează din <strong>WebDAV Server → Settings → Allow CORS</strong>.
+            </div>
+          </div>
+        </div>
+
+      </div>
       <div class="settings-panel" id="panel-synology">
 
         <!-- Flux diagram card -->
@@ -4067,6 +4149,181 @@ function prefillFromCatalog(brand, model, type, norm, lifespan, notes, workLifes
 const DB_KEY = 'alpicheck_db';
 let db = { equipment: [], inspections: [] };
 
+// ═══════════════════════════════════════════════════════
+// WEBDAV — backup/restore direct pe Synology NAS
+// ═══════════════════════════════════════════════════════
+
+function loadWebdavConfig() {
+  try { return JSON.parse(localStorage.getItem('ss_webdav_cfg') || '{}'); } catch { return {}; }
+}
+function saveWebdavConfig() {
+  const cfg = {
+    url:      document.getElementById('wdav-url')?.value.trim()  || '',
+    user:     document.getElementById('wdav-user')?.value.trim() || '',
+    pass:     document.getElementById('wdav-pass')?.value.trim() || '',
+    enabled:  document.getElementById('wdav-enabled')?.checked   || false,
+  };
+  localStorage.setItem('ss_webdav_cfg', JSON.stringify(cfg));
+  toast('⚙️ Configurare WebDAV salvată.', 'info');
+}
+function applyWebdavConfigToUI() {
+  const cfg = loadWebdavConfig();
+  const s = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  const c = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
+  s('wdav-url',  cfg.url);
+  s('wdav-user', cfg.user);
+  s('wdav-pass', cfg.pass);
+  c('wdav-enabled', cfg.enabled !== false);
+  _updateWebdavStatusUI();
+}
+
+function _webdavHeaders() {
+  const cfg = loadWebdavConfig();
+  return { 'Authorization': 'Basic ' + btoa(cfg.user + ':' + cfg.pass), 'Content-Type': 'application/json' };
+}
+
+function _webdavFileUrl() {
+  const cfg = loadWebdavConfig();
+  const base = cfg.url.replace(/\/$/, '');
+  return base + '/SicherShield/sicher_backup.json';
+}
+
+// Asigură că folderul /SicherShield există pe NAS
+async function _webdavEnsureFolder() {
+  const cfg  = loadWebdavConfig();
+  const base = cfg.url.replace(/\/$/, '');
+  const folderUrl = base + '/SicherShield';
+  try {
+    await fetch(folderUrl, { method: 'MKCOL', headers: _webdavHeaders() });
+    // MKCOL returnează 201 (creat) sau 405 (există deja) — ambele sunt OK
+  } catch {}
+}
+
+// Backup pe NAS (debounced 2s)
+let _wdavTimer = null;
+function _scheduleWebdavBackup() {
+  const cfg = loadWebdavConfig();
+  if (!cfg.enabled || !cfg.url || !cfg.user || !cfg.pass) return;
+  if (_wdavTimer) clearTimeout(_wdavTimer);
+  _wdavTimer = setTimeout(webdavBackupNow, 2000);
+}
+
+async function webdavBackupNow() {
+  const cfg = loadWebdavConfig();
+  if (!cfg.url || !cfg.user || !cfg.pass) {
+    toast('⚠️ Configurează WebDAV în Setări Cloud → WebDAV NAS.', 'error');
+    return;
+  }
+  _setWebdavStatus('syncing');
+  try {
+    await _webdavEnsureFolder();
+    const payload = JSON.stringify(db);
+    const r = await fetch(_webdavFileUrl(), {
+      method:  'PUT',
+      headers: _webdavHeaders(),
+      body:    payload,
+    });
+    if (!r.ok && r.status !== 201 && r.status !== 204)
+      throw new Error('HTTP ' + r.status + ' ' + r.statusText);
+    _setWebdavStatus('ok');
+    const el = document.getElementById('wdav-last-sync');
+    if (el) el.textContent = new Date().toLocaleString('ro-RO', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+    console.log('[WebDAV] Backup OK →', _webdavFileUrl());
+  } catch(e) {
+    _setWebdavStatus('error', e.message);
+    console.warn('[WebDAV] Backup eșuat:', e.message);
+  }
+}
+
+// Restore de pe NAS la pornire
+async function webdavRestoreOnLoad() {
+  const cfg = loadWebdavConfig();
+  if (!cfg.enabled || !cfg.url || !cfg.user || !cfg.pass) return false;
+  try {
+    const r = await fetch(_webdavFileUrl(), {
+      method:  'GET',
+      headers: { 'Authorization': 'Basic ' + btoa(cfg.user + ':' + cfg.pass) },
+      signal:  AbortSignal.timeout(8000),
+    });
+    if (!r.ok) return false;
+    const remoteDb = await r.json();
+    if (!remoteDb || (!remoteDb.equipment && !remoteDb.inspections)) return false;
+    const localItems  = (db.equipment||[]).length  + (db.inspections||[]).length;
+    const remoteItems = (remoteDb.equipment||[]).length + (remoteDb.inspections||[]).length;
+    if (remoteItems > localItems) {
+      db = remoteDb;
+      if (!db.equipment)     db.equipment     = [];
+      if (!db.inspections)   db.inspections   = [];
+      if (!db.customCatalog) db.customCatalog = [];
+      localStorage.setItem(DB_KEY, JSON.stringify(db));
+      console.log('[WebDAV] Restaurat de pe NAS:', remoteItems, 'înregistrări');
+      toast('🔄 Date sincronizate de pe NAS (' + remoteItems + ' înregistrări).', 'info');
+      return true;
+    }
+    console.log('[WebDAV] Date locale sunt la zi.');
+    return false;
+  } catch(e) {
+    console.warn('[WebDAV] Restore eșuat:', e.message);
+    return false;
+  }
+}
+
+// Test conexiune
+async function webdavTest() {
+  const cfg = loadWebdavConfig();
+  if (!cfg.url || !cfg.user || !cfg.pass) {
+    toast('⚠️ Completează URL, user și parolă.', 'error'); return;
+  }
+  _setWebdavStatus('syncing');
+  try {
+    // PROPFIND pe root — verifică autentificarea și accesul
+    const r = await fetch(cfg.url.replace(/\/$/, '') + '/', {
+      method:  'PROPFIND',
+      headers: { 'Authorization': 'Basic ' + btoa(cfg.user + ':' + cfg.pass), 'Depth': '0' },
+      signal:  AbortSignal.timeout(6000),
+    });
+    if (r.ok || r.status === 207) {
+      _setWebdavStatus('ok');
+      toast('✅ Conexiune WebDAV reușită!', 'success');
+    } else {
+      throw new Error('HTTP ' + r.status + (r.status === 401 ? ' — user/parolă greșite' : ' — acces refuzat'));
+    }
+  } catch(e) {
+    _setWebdavStatus('error', e.message);
+    toast('❌ WebDAV: ' + e.message, 'error');
+  }
+}
+
+function _setWebdavStatus(state, msg) {
+  const badge = document.getElementById('wdav-status-badge');
+  const text  = document.getElementById('wdav-status-text');
+  const map = {
+    'ok':      ['✅', 'var(--green)',  'Conectat'],
+    'syncing': ['🔄', 'var(--yellow)', 'Se sincronizează…'],
+    'error':   ['❌', 'var(--red)',    'Eroare: ' + (msg||'')],
+    'idle':    ['⚪', 'var(--text3)',  'Neconfigurat'],
+  };
+  const [icon, color, label] = map[state] || map['idle'];
+  if (badge) { badge.textContent = icon; badge.style.color = color; }
+  if (text)  { text.textContent  = label; text.style.color = color; }
+  // Actualizează și badge-ul din sidebar
+  const navBadge = document.getElementById('webdav-nav-badge');
+  if (navBadge) {
+    navBadge.style.display = state === 'ok' ? '' : 'none';
+  }
+}
+
+function _updateWebdavStatusUI() {
+  const cfg = loadWebdavConfig();
+  if (!cfg.url || !cfg.user || !cfg.pass) {
+    _setWebdavStatus('idle');
+  } else if (cfg.enabled) {
+    _setWebdavStatus('ok');
+  } else {
+    _setWebdavStatus('idle');
+  }
+}
+
 function loadDB() {
   try {
     const raw = localStorage.getItem(DB_KEY);
@@ -4082,6 +4339,7 @@ function loadDB() {
 function saveDB() {
   localStorage.setItem(DB_KEY, JSON.stringify(db));
   updateSidebarCounts();
+  _scheduleWebdavBackup();
 }
 
 function genId() {
@@ -7269,7 +7527,12 @@ function clearDriveLog() {
 // ── Init on page load ─────────────────────────────────
 function initDriveOnPageLoad() {
   applyDriveConfigToUI();
-  // GIS and GAPI load async — _maybeInitDrive() called by each when ready
+  applyWebdavConfigToUI();
+  // Restore de pe NAS la pornire (asincron)
+  webdavRestoreOnLoad().then(restored => {
+    if (restored) { renderDashboard(); updateSidebarCounts(); }
+  });
+  // GIS și GAPI se încarcă async — _maybeInitDrive() e apelat de fiecare când e gata
 }
 
 // ═══════════════════════════════════════════════════════
@@ -7382,6 +7645,18 @@ setTimeout(() => {
 
 
 loadDB();
+// Pre-completare credențiale WebDAV (prima rulare)
+(function() {
+  const existing = localStorage.getItem('ss_webdav_cfg');
+  if (!existing || !JSON.parse(existing).url) {
+    localStorage.setItem('ss_webdav_cfg', JSON.stringify({
+      url:     'https://nts2022.ddns.net:5006',
+      user:    'SicherShield',
+      pass:    'Sicher2026!',
+      enabled: true,
+    }));
+  }
+})();
 renderDashboard();
 updateSidebarCounts();
 applyMobileUI();
