@@ -2742,7 +2742,7 @@ const PRODUCT_DB = [
   { brand:'Edelrid', type:'Dispozitiv anticadere', model:'Inertia Reel SRL 2m', norm:'EN 360',           lifespan:10, notes:'Bloc retractabil 2m (SRL); cablu otel 3mm; declansare la cadere > 0.3m; corp aluminiu' },
   { brand:'Edelrid', type:'Dispozitiv anticadere', model:'Inertia Reel SRL 3m', norm:'EN 360',           lifespan:10, notes:'Bloc retractabil 3m; izolatie IP54; functionare -30 la +60°C' },
   { brand:'Edelrid', type:'Dispozitiv anticadere', model:'Rope Grab PR',        norm:'EN 353-2',         lifespan:10, notes:'Antichute pe coarda flexibila (FABA); blocare automata la cadere; corzi 10-13mm' },
-  { brand:'Edelrid', type:'Dispozitiv anticadere', model:'Ohm II',              norm:'EN 12841 tip C',   lifespan:10, notes:'Dispozitiv asistare franare; reduce forta de cadere in sisteme cu diferente mari de greutate' },
+  { brand:'Edelrid', type:'Dispozitiv anticadere', model:'Ohm II',              norm:'EN 12841 tip C',   lifespan:10, notes:'Dispozitiv asistare franare; reduce forta de cadere in sisteme cu diferente mari de greutate; conexiune surub-cilindru pentru fixare textila', recall:{ status:'active', ref:'Edelrid Safety Notice — OHM II / OHMEGA / FUSE (Aprilie 2026)', description:'In aprilie 2026 a fost descoperit un montaj incorect al conexiunii surub-cilindru: cilindrul si surubul introduse din aceeasi directie. Verificati inainte de utilizare: cilindrul (1) si surubul (2) trebuie introduse din directii OPUSE, capul surubului flush cu flansele. Ref. 73829.', date:'2026-04-01', url:'https://edelrid.com/int-en/service/recalls/general-safety-notice-ohm-ohmega-fuse' } },
 
   // ── Dispozitive anticadere Climbing Technology ──
   { brand:'Climbing Technology', type:'Dispozitiv anticadere', model:'Mini Fall Arrester SRL 2m', norm:'EN 360',   lifespan:10, notes:'Bloc retractabil compact 2m (SRL); cablu otel 2.5mm; corp ABS; 380g; max 140 kg' },
@@ -2791,6 +2791,173 @@ const PRODUCT_DB = [
   { brand:'HACA Leitern', type:'Dispozitiv anticadere', model:'MultiSafe Slider 0529 (inchis)',
     norm:'EN 353-1:2014+A1:2017', lifespan:10,
     notes:'Runner inchis pe sina rigida HACA; montare doar de la capatul sinei sau prin flap de acces; 3 functii prindere independente; utilizare sisteme cu poarta sau intrare de sus/jos; frecvent pe turnuri eoliene Senvion/REpower si GE Wind; fabricat in Germania (Bad Camberg).' },
+
+  // ══════════════════════════════════════════════════════════════════
+  //  CAMP — Produse Noi 2026 (sursa: www.camp.it/d/ot/en/work/new/category)
+  // ══════════════════════════════════════════════════════════════════
+
+  // ── Hamuri corp complet noi 2026 ──
+  { brand:'Camp', type:'Ham', model:'GT Turbo',               norm:'EN 361 + EN 358 + EN 813', lifespan:10, notes:'Ham corp complet NOU 2026; serie GT Turbo; acces pe franghie si lucru la inaltime; bretele ergonomice cu padding; multiple puncte de conectare' },
+  { brand:'Camp', type:'Ham', model:'GT Turbo XT',            norm:'EN 361 + EN 358 + EN 813', lifespan:10, notes:'Ham corp complet NOU 2026; versiune XT (extra tough); bretele ranforsate; ideal medii abrazive; acces pe franghie' },
+  { brand:'Camp', type:'Ham', model:'GT Lite XT',             norm:'EN 361 + EN 358 + EN 813', lifespan:10, notes:'Ham corp complet NOU 2026; versiune Lite XT; greutate redusa; bretele subtiri dar rezistente; ideal lucru la inaltime uzul zilnic' },
+  { brand:'Camp', type:'Ham', model:'GT XT',                  norm:'EN 361 + EN 358 + EN 813', lifespan:10, notes:'Ham corp complet NOU 2026; seria GT XT; design robust; bretele cu ajustare rapida; acces pe franghie si spatii confiniate' },
+  { brand:'Camp', type:'Ham', model:'GT XT Black',            norm:'EN 361 + EN 358 + EN 813', lifespan:10, notes:'Ham corp complet NOU 2026; GT XT editie Black; design monocrom; aceleasi performante GT XT cu finisaj negru' },
+  { brand:'Camp', type:'Ham', model:'Vertical Plus',          norm:'EN 361 + EN 358',          lifespan:10, notes:'Ham corp complet NOU 2026; design vertical; bretele late cu padding; pozitionare si cadere libera; reglaj rapid' },
+  { brand:'Camp', type:'Ham', model:'Vertical Plus XXXL',     norm:'EN 361 + EN 358',          lifespan:10, notes:'Ham corp complet NOU 2026; Vertical Plus marime XXXL; pana la 200 kg; bretele extra-largi; reglaj extins' },
+  { brand:'Camp', type:'Ham', model:'Vertical',               norm:'EN 361 + EN 358',          lifespan:10, notes:'Ham corp complet NOU 2026; model standard Vertical; utilizare generala lucru la inaltime; catarame automate' },
+  { brand:'Camp', type:'Ham', model:'Vertical XXXL',          norm:'EN 361 + EN 358',          lifespan:10, notes:'Ham corp complet NOU 2026; Vertical marime XXXL; utilizatori pana la 200 kg; bretele extra-reglabile' },
+  { brand:'Camp', type:'Ham', model:'Basic Duo',              norm:'EN 361 + EN 358',          lifespan:10, notes:'Ham corp complet NOU 2026; model entry-level Duo; doua bretele de umar; simplu si usor de utilizat; ideal formare PSA' },
+
+  // ── Accesorii ham ──
+  { brand:'Camp', type:'Carabiniera', model:'Nexum Spare Part', norm:'EN 362', lifespan:10, notes:'Carabiniera de schimb NOU 2026 pentru sistemul Nexum; piesa de rezerva certificata; compatibila cu hamurile Camp cu sistem Nexum' },
+
+  // ── Casti noi 2026 ──
+  { brand:'Camp', type:'Casca', model:'Ares MIPS International', norm:'EN 397 + EN 12492', lifespan:5, notes:'Casca NOU 2026; sistem MIPS (Multi-directional Impact Protection System); versiune internationala; dubla certificare industrie + alpinism; protectie impact rotational' },
+
+  // ── Longe / amortizoare noi 2026 ──
+  { brand:'Camp', type:'Longa Y / Amortizor', model:'Retexo Gyro Rewind',    norm:'EN 355', lifespan:10, notes:'Longa elastica NOU 2026; sistem Gyro (pivotare 360°) + Rewind elastic; certificata utilizare orizontala pe muchii; max. 130 kg; indicator cadere' },
+  { brand:'Camp', type:'Longa Y / Amortizor', model:'Retexo Rope',           norm:'EN 354 + EN 355', lifespan:5,  notes:'Longa pe coarda NOU 2026; seria Retexo; constructie kernmantle; amortizor integrat; max. 130 kg; capete cu conectori certificati' },
+  { brand:'Camp', type:'Longa pozitionare', model:'Gyro Lanyard Single',     norm:'EN 358 + EN 354', lifespan:5,  notes:'Longa reglabila NOU 2026; un singur brat; conector Gyro cu pivotare 360°; ajustare continua; utilizare pozitionare la inaltime' },
+  { brand:'Camp', type:'Longa pozitionare', model:'Gyro Lanyard Twin',       norm:'EN 358 + EN 354', lifespan:5,  notes:'Longa reglabila NOU 2026; doua brate; conectori Gyro pivotanti; ajustare independenta; deplasare sigura pe structuri' },
+  { brand:'Camp', type:'Longa pozitionare', model:'Gyro Lanyard Double',     norm:'EN 358 + EN 354', lifespan:5,  notes:'Longa reglabila NOU 2026; configuratie dubla; conectori Gyro; utilizare sisteme de pozitionare bilaterala' },
+  { brand:'Camp', type:'Longa pozitionare', model:'Gyro Keeper Loop',        norm:'EN 354',          lifespan:5,  notes:'Accesoriu bucla NOU 2026 pentru sistemul Gyro; mentinere longa in pozitie; reduce pericolul de agatare' },
+  { brand:'Camp', type:'Longa pozitionare', model:'Druid Lanyard',           norm:'EN 358 + EN 354', lifespan:5,  notes:'Longa reglabila NOU 2026 pe coarda; bazata pe descendorul Druid; reglaj cu o mana; utilizare acces pe franghie si pozitionare' },
+  { brand:'Camp', type:'Longa pozitionare', model:'Rope Adjuster',           norm:'EN 358 + EN 354', lifespan:5,  notes:'Longa reglabila NOU 2026; ajustare simpla pe coarda; reglaj rapid fara dispozitive suplimentare; utilizare generala pozitionare' },
+
+  // ── Dispozitive de ancorare noi 2026 ──
+  { brand:'Camp', type:'Dispozitiv ancorare', model:'Speedy Anchor',         norm:'EN 795 tip A', lifespan:5,  notes:'Banda de ancorare reglabila NOU 2026; montare rapida pe structuri; lungime reglabila; utilizare ancorare temporara pe grinzi si stalpi' },
+  { brand:'Camp', type:'Dispozitiv ancorare', model:'AnchorPro',             norm:'EN 795 tip A', lifespan:10, notes:'Placa de ancorare multipla NOU 2026; mai multe puncte de prindere; otel inoxidabil; montare fixa pe structuri metalice si beton' },
+  { brand:'Camp', type:'Dispozitiv ancorare', model:'IB-Roller',             norm:'EN 795 tip D', lifespan:10, notes:'Ancora pe grinda metalica cu role NOU 2026; deplasare pe talpa grinzii I; fara interventie structurala; ideal hale industriale' },
+  { brand:'Camp', type:'Dispozitiv ancorare', model:'IB-Slider',             norm:'EN 795 tip D', lifespan:10, notes:'Ancora pe grinda metalica tip slider NOU 2026; montare pe talpa inferioara grinda I; deplasare liniara; sistem linie de viata orizontala' },
+  { brand:'Camp', type:'Dispozitiv ancorare', model:'Spare Loop for Temporary Lifeline', norm:'EN 795 tip C', lifespan:5, notes:'Bucla de schimb NOU 2026 pentru linia de viata temporara Camp; piesa de rezerva certificata; compatibila Temporary Lifeline 18m si 30m' },
+
+  // ── Dispozitive mecanice actualizate 2026 ──
+  { brand:'Camp', type:'Dispozitiv anticadere', model:'Cobra 2',             norm:'EN 360',  lifespan:10, notes:'Bloc retractabil ACTUALIZAT 2026; cablu otel 2m; declansare rapida; corp ABS; max 140 kg; IP54' },
+  { brand:'Camp', type:'Dispozitiv anticadere', model:'Cobra 6',             norm:'EN 360',  lifespan:10, notes:'Bloc retractabil ACTUALIZAT 2026; cablu otel 6m; utilizare structuri si schele; max 140 kg; carcasa ranforsata' },
+  { brand:'Camp', type:'Dispozitiv anticadere', model:'Cobra 10',            norm:'EN 360',  lifespan:10, notes:'Bloc retractabil ACTUALIZAT 2026; cablu otel 10m; turnuri si catarge; max 140 kg' },
+  { brand:'Camp', type:'Dispozitiv anticadere', model:'Cobra 15',            norm:'EN 360',  lifespan:10, notes:'Bloc retractabil ACTUALIZAT 2026; cablu otel 15m; structuri inalte; max 140 kg' },
+  { brand:'Camp', type:'Dispozitiv anticadere', model:'Cobra 20',            norm:'EN 360',  lifespan:10, notes:'Bloc retractabil ACTUALIZAT 2026; cablu otel 20m; max 140 kg; utilizare eoliene si turnuri telecom' },
+  { brand:'Camp', type:'Dispozitiv anticadere', model:'Cobra 30',            norm:'EN 360',  lifespan:10, notes:'Bloc retractabil ACTUALIZAT 2026; cablu otel 30m; aplicatii industriale speciale; max 140 kg' },
+  { brand:'Camp', type:'Dispozitiv anticadere', model:'Cobra Lift 10',       norm:'EN 360 + EN 1496', lifespan:10, notes:'Bloc retractabil cu troliu ACTUALIZAT 2026; 10m cablu; recuperare victime; max 140 kg; ideal spatii confiniate' },
+  { brand:'Camp', type:'Dispozitiv anticadere', model:'Cobra Lift 25',       norm:'EN 360 + EN 1496', lifespan:10, notes:'Bloc retractabil cu troliu ACTUALIZAT 2026; 25m cablu; salvare la inaltime; max 140 kg' },
+  { brand:'Camp', type:'Dispozitiv anticadere', model:'Cobra Lift 35',       norm:'EN 360 + EN 1496', lifespan:10, notes:'Bloc retractabil cu troliu ACTUALIZAT 2026; 35m cablu; operatiuni de salvare complexe; max 140 kg' },
+  // ── Blocant sternal (ascensor) cu aviz siguranță ──
+  { brand:'Camp', type:'Dispozitiv anticadere', model:'TurboChest Ascender',
+    norm:'EN 567 + EN 12841 tip B', lifespan:10,
+    notes:'Blocant sternal (ascensor) pentru coarda; certificat CE conform EN 567 si EN 12841/B; sistem calitate certificat; fabricat in Italia. ATENTIE: au fost detectate copii contrafacute pe site-uri e-commerce — verificati autenticitatea la cumparare.',
+    recall:{ status:'watch', ref:'Camp Safety Notice — TurboChest Ascender: Doubtful Product Copies', description:'In cadrul supravegherii de piata, Camp a detectat mai multe copii dubioase ale ascensorului TurboChest vandute pe site-uri de e-commerce. Produsele contrafacute nu au certificare, performanta si siguranta incerta. Achizitionati doar de la distribuitori autorizati Camp. Originalul este certificat CE conform EN 567 si EN 12841/B si fabricat intr-un sistem de calitate certificat.', date:'2023-01-01', url:'https://www.camp.it/d/ot/en/work/content/1298' } },
+
+  { brand:'Camp', type:'Dispozitiv anticadere', model:'Goblin',              norm:'EN 353-2', lifespan:10, notes:'Antichute pe coarda ACTUALIZAT 2026; blocare automata progresiva; corzi 10-13mm EN 1891; max 140 kg' },
+  { brand:'Camp', type:'Dispozitiv anticadere', model:'Goblin Black',        norm:'EN 353-2', lifespan:10, notes:'Antichute pe coarda ACTUALIZAT 2026; editie Black; aceleasi performante Goblin cu finisaj negru' },
+  { brand:'Camp', type:'Dispozitiv anticadere', model:'Blin Kit',            norm:'EN 353-2', lifespan:10, notes:'Kit antichute pe coarda ACTUALIZAT 2026; set complet cu coarda; scari fixe si structuri verticale; max 140 kg' },
+  { brand:'Camp', type:'Dispozitiv anticadere', model:'Lift',                norm:'EN 353-2', lifespan:10, notes:'Blocant pe coarda ACTUALIZAT 2026; deplasare cu o mana; ideal scari fixe si stalpii de catarare; maner ergonomic' },
+
+  // ── Scripete si dispozitive mecanice noi 2026 ──
+  { brand:'Camp', type:'Scripete', model:'Turbolock',                        norm:'EN 12278 + EN 12841 tip B', lifespan:10, notes:'Scripete captare progres ACTUALIZAT 2026; roata cu rulmenti; scripete + blocant integrat; utilizare sisteme tehnice complexe; corzi 8-13mm' },
+  { brand:'Camp', type:'Scripete', model:'Turbolock Black',                  norm:'EN 12278 + EN 12841 tip B', lifespan:10, notes:'Turbolock ACTUALIZAT 2026 editie Black; aceleasi performante Turbolock cu finisaj negru' },
+
+  // ── Corzi dinamice noi 2026 ──
+  { brand:'Camp', type:'Coarda dinamica', model:'Expression 9.8mm',         norm:'EN 892',  lifespan:10, notes:'Coarda dinamica NOU 2026; 9.8mm; utilizare alpinism si acces pe franghie; manta rezistenta; tratament dry optional' },
+
+  // ── Carabiniere noi 2026 ──
+  { brand:'Camp', type:'Carabiniera', model:'Orbit 2Lock',                   norm:'EN 362',  lifespan:10, notes:'Carabiniera NOU 2026; sistem blocare dubla actiune (2Lock); forma ovoidala; aluminiu; usor si rezistent; 25 kN' },
+  { brand:'Camp', type:'Carabiniera', model:'Thor',                          norm:'EN 362',  lifespan:10, notes:'Inel de conectare multi-directional NOU 2026; deschidere completa; otel inoxidabil; rotire libera 360°; ancorare si conexiuni permanente; 50 kN' },
+  { brand:'Camp', type:'Carabiniera', model:'Thor Black',                    norm:'EN 362',  lifespan:10, notes:'Thor NOU 2026 editie Black; inel multi-directional otel cu finisaj negru; aceleasi performante Thor' },
+
+  // ── Dispozitive de salvare noi 2026 ──
+  { brand:'Camp', type:'Dispozitiv salvare', model:'TurboRescue',            norm:'EN 1496', lifespan:10, notes:'Troliu portabil de salvare NOU 2026; ridicare si coborare victime; utilizare spatii confiniate si lucru la inaltime; actionare manuala sau motorizata; max 200 kg' },
+  { brand:'Camp', type:'Dispozitiv salvare', model:'TurboRescue Druid Kit',  norm:'EN 1496', lifespan:10, notes:'Kit de salvare NOU 2026; TurboRescue + descendor Druid; set complet pentru salvare rapida; spatii confiniate si lucru la inaltime' },
+  { brand:'Camp', type:'Dispozitiv salvare', model:'C.R.S. Set',             norm:'EN 1496', lifespan:10, notes:'Kit de salvare C.R.S. NOU 2026 (Confined Rescue System); sistem complet pentru spatii confiniate; scripeti + ancore + corzi; certificat EN 1496' },
+  { brand:'Camp', type:'Dispozitiv salvare', model:'C.R.S. Evo Set',         norm:'EN 1496', lifespan:10, notes:'Kit de salvare C.R.S. Evo NOU 2026; versiune evolutiva a C.R.S. Set; componente imbunatatite; greutate redusa; ambalaj compact' },
+
+  // ── Tripod / troliu actualizat 2026 ──
+  { brand:'Camp', type:'Dispozitiv salvare', model:'Tripos',                 norm:'EN 795 + EN 1496', lifespan:10, notes:'Tripod ACTUALIZAT 2026; structura aluminiu; montare rapida; utilizare recuperare din spatii confiniate; inaltime reglabila; max 250 kg' },
+  { brand:'Camp', type:'Dispozitiv salvare', model:'Tripos Lift',            norm:'EN 1496', lifespan:10, notes:'Troliu pentru Tripos ACTUALIZAT 2026; actionare manuala; viteza controlata coboare/ridicare; max 200 kg; compatibil tripod Tripos' },
+
+  // ── Ham arboricol nou 2026 (cu recall safety notice) ──
+  { brand:'Camp', type:'Ham', model:'Tree Access Evo',
+    norm:'EN 358 + EN 813', lifespan:10,
+    notes:'Ham arboricol tip sezut (ref. 2163); punte coarda fixata cu suruburi metalice; reglaj punte prin suruburi Allen 5mm (12 Nm); NFC TRACK; utilizare catarare in copaci si arboricola.',
+    recall:{ status:'watch', ref:'Camp Safety Notice — Tree Access Evo (ref.2163)', description:'Un client a raportat slabirea unui surub al inelului metalic al puntii de coarda in timpul catararii. Nu au fost raportate accidente. Masura preventiva: verificati si strangeti toate suruburile cu cheie dinamometrica Allen 5mm la 12 Nm (8.85 ft-lb); aplicati Loctite 243 pe filet. Camp a inceput aplicarea Loctite 243 din fabricatie. Inspectati suruburile inainte si dupa fiecare utilizare.', date:'2023-01-01', url:'https://www.camp.it/d/ot/en/work/content/1297' } },
+
+  // ══════════════════════════════════════════════════════════════════
+  //  EDELRID — Produse Noi 2025 (sursa: edelrid.com/professional)
+  // ══════════════════════════════════════════════════════════════════
+
+  // ── Căști noi 2025 ──
+  { brand:'Edelrid', type:'Casca', model:'Tectum',
+    norm:'EN 397 + EN 50365', lifespan:10,
+    notes:'Casca de siguranta la lucru NOU 2025; shell ABS + interior EPS; protectie electrica EN 50365 cls.1 + ANSI/ISEA Z89.1-2014 tip I cls.E; Euroslots pentru accesorii; sistem reglaj Wing Fit cu selector; curea barbie reglabila; ideal industrie si lucru la inaltime.' },
+
+  { brand:'Edelrid', type:'Casca', model:'Tectum Air',
+    norm:'EN 12492 + EN 397', lifespan:10,
+    notes:'Casca de siguranta cu ventilatie inchidibila NOU 2025; dubla certificare EN 12492 (alpinism) + EN 397 (cu venturi inchise) + ANSI/ISEA Z89.1-2014 tip I cls.C; shell ABS + EPS; Euroslots accesorii; Wing Fit; ideal acces pe franghie, industrie, arboricola.' },
+
+  // ── Ham arboricol actualizat 2025 ──
+  { brand:'Edelrid', type:'Ham', model:'Treerex II',
+    norm:'EN 358 + EN 813', lifespan:10,
+    notes:'Ham arboricol actualizat NOU 2025; tehnologie 3D Vent + padding semi-rigid lat; multiple configuratii punte coarda; punte SRT optionala (tehnica monocord); inele D inclinate pentru libertate de miscare; suspensor drujba; 4 inele mari pentru echipament; indicator uzura banda rosie.' },
+
+  // ══════════════════════════════════════════════════════════════════
+  //  EDELRID — Produse Noi 2026 (sursa: edelrid.com/professional)
+  // ══════════════════════════════════════════════════════════════════
+
+  // ── Hamuri noi/actualizate seria FLEX 2026 ──
+  { brand:'Edelrid', type:'Ham', model:'Flex Lite',
+    norm:'EN 361', lifespan:10,
+    notes:'Ham anticadere NOU 2026 — cel mai usor din seria FLEX; inel D dorsal metalic fixabil (VCR) sau glisant; protectori spate din plastic (alunecare usoara in puturi inguste); catarame Double Lock picioare/sold; indicator cadere 6kN vizibil fereastra spate; banda indicator uzura rosie; ochi material detasabil 25kg (non-EPI); buzunar RFID.' },
+
+  { brand:'Edelrid', type:'Ham', model:'Flex Pro',
+    norm:'EN 361 + EN 358', lifespan:10,
+    notes:'Ham anticadere confortabil ACTUALIZAT 2026; centura lombara anatomica pre-formata; 4 inele portechipament; inel D dorsal metalic actualizat; protectori spate + solduri; ochi textil anticadere dorsal + sternal ramane deschis sub presolicitare; indicator cadere 6kN; Easy Glider bretele; buzunar RFID + fixare statie radio.' },
+
+  { brand:'Edelrid', type:'Ham', model:'Flex Pro Plus',
+    norm:'EN 361 + EN 358', lifespan:10,
+    notes:'Ham anticadere complet ACTUALIZAT 2026; toate caracteristicile Flex Pro plus ochi catarare mobil integrat; ideal lucru complex la inaltime; sistem jacket usor de imbracat; ochi textil anticadere (1 dorsal + 2 sternale) raman deschise sub presolicitare; indicator cadere 6kN; placa spate detasabila.' },
+
+  // ── Protectoare coarda noi 2026 ──
+  { brand:'Edelrid', type:'Accesoriu coarda', model:'Protector',
+    norm:'—', lifespan:5,
+    notes:'Protector coarda flexibil ACTUALIZAT 2026; fixare prin Velcro (retrofit usor); clip coarda integrat; atasare/detasare rapida fara franghie Prusik suplimentara; ramane fix in pozitie.' },
+
+  { brand:'Edelrid', type:'Accesoriu coarda', model:'Protector Max',
+    norm:'—', lifespan:5,
+    notes:'Protector coarda modular tip covoraș NOU 2026; nervuri aluminiu modulare; protectie optima in orice situatie; reglabil la zona de utilizare, traseul corzii si echipamentul; ideal muchii ascutite si suprafete abrazive.' },
+
+  { brand:'Edelrid', type:'Accesoriu coarda', model:'Protector Aramid',
+    norm:'—', lifespan:5,
+    notes:'Protector coarda tip furtun NOU 2026 din material aramidic; protectie tăiere si caldura integrata; material extrem de rezistent; completeaza gama Protector pentru situatii cu risc ridicat de taiere si caldura (torchere, muchii metalice).' },
+
+  // ── Hardware nou 2026 ──
+  { brand:'Edelrid', type:'Scripete', model:'Maxiom Rig Slider',
+    norm:'EN 12278', lifespan:10,
+    notes:'Scripete mare cu carabiniera integrata NOU 2026; rola cu rulmenti cu bile; ideal sisteme palan si ancore directionale in siguranta la lucru si salvare tehnica; utilizare vasta.' },
+
+  { brand:'Edelrid', type:'Carabiniera', model:'Maxiom Rig Triple',
+    norm:'EN 362', lifespan:10,
+    notes:'Carabiniera Triple Lock cu scripete integrat NOU 2026; pentru deflectii coarda; mare deschidere poarta; rola integrata reduce frecarea; utilizare sisteme tehnice rescue si lucru la inaltime.' },
+
+  { brand:'Edelrid', type:'Accesoriu salvare', model:'Crawler 2R',
+    norm:'—', lifespan:10,
+    notes:'Cub pliabil compact NOU 2026 pentru franghii de aruncat si accesorii; pliere la format mic; desfasurare rapida (rasucire simpla); capac liber; bucea cu inel metalic pentru capatul franghiei; buzunar interior saci aruncat; maner; ~80m franghie; gauri drenaj coltare.' },
+
+  // ══════════════════════════════════════════════════════════════════
+  //  EDELRID — Recall / Safety Notices active
+  //  Sursa: edelrid.com/int-en/service/recalls
+  // ══════════════════════════════════════════════════════════════════
+
+  // OHM II / OHMEGA / FUSE — aviz siguranță activ (mai 2026)
+  // Ohm II: recall adaugat direct pe intrarea existenta din baza (Dispozitiv anticadere)
+
+  { brand:'Edelrid', type:'Dispozitiv asigurare', model:'Ohmega',
+    norm:'EN 12841 tip C', lifespan:10,
+    notes:'Asistent franare versatil 190g; 3 niveluri franare prin bucla HMPE; scripete integrat reduce frecarea la primul punct; franeaza si la cadere directa in dispozitiv; utilizare sala catarare, stanca, alpinism sport.',
+    recall:{ status:'active', ref:'Edelrid Safety Notice — OHM II / OHMEGA / FUSE (Aprilie 2026)', description:'In aprilie 2026 a fost descoperit un OHMEGA intr-o sala de catarare unde cilindrul si surubul conexiunii textile fusesera introduse din aceeasi directie, impiedicand surubul sa fixeze manseta. Edelrid recomanda verificarea imediata: cilindrul introdus dintr-o directie (1), surubul din directia opusa (2) pana cand capul este flush cu flansele. Verificati conform manualului inainte de fiecare utilizare.', date:'2026-04-01', url:'https://edelrid.com/int-en/service/recalls/general-safety-notice-ohm-ohmega-fuse' } },
+
+  { brand:'Edelrid', type:'Dispozitiv asigurare', model:'Fuse',
+    norm:'EN 15151-2', lifespan:10,
+    notes:'Dispozitiv asigurare Edelrid Fuse (88256); conexiune surub-cilindru pentru fixare textila langa.',
+    recall:{ status:'active', ref:'Edelrid Safety Notice — OHM II / OHMEGA / FUSE (Aprilie 2026)', description:'In aprilie 2026 a fost descoperit un caz de montaj incorect al conexiunii surub-cilindru pe OHMEGA din aceeasi familie. Edelrid recomanda verificarea FUSE (88256): cilindrul (1) si surubul (2) trebuie introduse din directii OPUSE, capul surubului flush cu flansele. Nu utilizati fara verificare conform manualului.', date:'2026-04-01', url:'https://edelrid.com/int-en/service/recalls/general-safety-notice-ohm-ohmega-fuse' } },
 
 ];
 
