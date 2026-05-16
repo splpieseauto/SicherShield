@@ -1846,19 +1846,18 @@ textarea { resize: vertical; min-height: 80px; }
       <div class="page-header">
         <div>
           <div class="page-title">Scanare</div>
-          <div class="page-sub">Scanează QR sau NFC pentru a identifica echipamentul</div>
+          <div class="page-sub">Scanează NFC sau QR pentru a identifica echipamentul</div>
         </div>
       </div>
 
       <div class="scan-area" id="scan-area">
         <div id="scan-idle">
-          <div class="scan-icon">📷</div>
+          <div class="scan-icon">📡</div>
           <div class="scan-title">Scanează echipamentul</div>
-          <div class="scan-sub">Folosește camera pentru QR sau NFC pentru a accesa fișa echipamentului</div>
+          <div class="scan-sub">Apropie tag-ul NFC sau folosește camera pentru QR pentru a accesa fișa echipamentului</div>
           <div class="scan-methods">
-            <button class="btn btn-primary" onclick="startQRScan()">📷 Scanare QR</button>
-            <button class="btn btn-sec" onclick="startNFCScan()">📡 Citire NFC</button>
-            <button class="btn btn-sec" onclick="showProgramNewTagPicker()">📡 Programează tag nou</button>
+            <button class="btn btn-primary" onclick="startNFCScan()">📡 Citire NFC</button>
+            <button class="btn btn-sec" onclick="startQRScan()">📷 Scanare QR</button>
             <button class="btn btn-ghost" onclick="manualLookup()">⌨️ Cod manual</button>
           </div>
         </div>
@@ -4728,7 +4727,7 @@ function renderInspectForm(equipId) {
       <p style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.6">Foto generale ale echipamentului sau deteriorărilor neassociate unui punct. Imaginile sunt comprimate automat (~200 KB).</p>
       <div class="photo-grid" id="general-photo-grid" style="margin-bottom:10px"></div>
       <button class="btn btn-sec btn-sm" onclick="triggerPhotoGeneral()">📷 Adaugă fotografie generală</button>
-      <input type="file" id="photo-input-general" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this, null)">
+      <input type="file" id="photo-input-general" accept="image/*" capture="environment" multiple style="display:none" onchange="handlePhotoUpload(this, null)">
     </div>
 
     <div class="card">
@@ -4747,19 +4746,21 @@ function renderInspectForm(equipId) {
       </div>
     </div>
 
-    <div class="d-flex" style="justify-content:flex-end;gap:8px">
+    <div class="d-flex" style="justify-content:flex-end;gap:8px;flex-wrap:wrap">
       <button class="btn btn-ghost" onclick="showPage('equipment')">Anulare</button>
+      <button class="btn btn-sec" onclick="writeNfcFromInspection()">📡 Scrie NFC</button>
       <button class="btn btn-sec" onclick="saveInspection(true)">📄 Salvează + PDF</button>
       <button class="btn btn-primary" onclick="saveInspection()">💾 Salvează inspecția</button>
     </div>
   `;
 
-  // create hidden file inputs per check item (for camera/gallery access)
+  // create hidden file inputs per check item (camera-first: opens rear camera directly)
   checks.forEach(c => {
     const inp = document.createElement('input');
     inp.type = 'file';
     inp.id = 'photo-input-' + safeId(c);
     inp.accept = 'image/*';
+    inp.setAttribute('capture', 'environment');
     inp.multiple = true;
     inp.style.display = 'none';
     inp.addEventListener('change', function(){ handlePhotoUpload(this, safeId(c)); });
@@ -5041,29 +5042,140 @@ function saveInspection(generatePdf = false) {
   driveAutoUploadAfterInspection(ins);
   if (generatePdf) { setTimeout(() => generateInspectionPDF(ins, false), 300); }
   showDetail(equipId);
-  // After detail is shown, if equipment has no NFC tag programmed yet and Web NFC is supported,
-  // offer to program the tag right now with the verification URL.
-  if (eq && !eq.nfcTagWritten && ('NDEFReader' in window)) {
-    setTimeout(() => offerWriteNfcAfterInspection(equipId), 600);
-  }
+  // After detail is shown, offer post-save actions: rewrite tag, download PDF, download CSV
+  setTimeout(() => offerPostInspectionActions(ins.id, equipId), 600);
 }
 
-function offerWriteNfcAfterInspection(equipId) {
+// Modal shown after saving an inspection — lets the user perform follow-up actions
+// in one place: program/rewrite the NFC tag, download the inspection PDF, and
+// export the inspection to CSV.
+function offerPostInspectionActions(inspId, equipId) {
   const eq = db.equipment.find(e => e.id === equipId);
-  if (!eq) return;
-  showModal('post-inspection-nfc');
-  document.getElementById('modal-title').textContent = '📡 Programează tag NFC';
+  const ins = db.inspections.find(i => i.id === inspId);
+  if (!eq || !ins) return;
+  const nfcSupported = ('NDEFReader' in window);
+  const tagWritten   = !!eq.nfcTagWritten;
+  const tagBtnLabel  = tagWritten ? '📡 Rescrie tag NFC' : '📡 Scrie tag NFC';
+  const tagInfo      = tagWritten
+    ? `Tag-ul a fost programat ultima dată pe <strong>${eq.nfcTagWritten}</strong>. Rescrierea va actualiza link-ul, dar la scanare se va deschide oricum cea mai recentă inspecție.`
+    : `Echipamentul nu are încă un tag NFC programat. La scanare se va deschide direct fișa cu cea mai recentă inspecție.`;
+
+  showModal('post-inspection-actions');
+  document.getElementById('modal-title').textContent = '✅ Inspecție salvată — ce vrei să faci acum?';
   document.getElementById('modal-body').innerHTML = `
     <div style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:14px">
-      <strong>${eq.name}</strong> nu are încă un tag NFC programat.
-      <br><br>
-      Vrei să programezi acum un tag nou? Tag-ul va conține link-ul de verificare cu ID-ul echipamentului — la viitoarea scanare se va deschide direct fișa cu cea mai recentă inspecție.
+      Inspecția pentru <strong>${eq.name}</strong> a fost salvată cu succes${ins.photos&&ins.photos.length?` (${ins.photos.length} foto)`:''}.
     </div>
-    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-ghost" onclick="closeModal()">Sar peste</button>
-      <button class="btn btn-primary" onclick="closeModal();startNfcWrite('${equipId}')">📡 Scrie tag NFC acum</button>
+
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:6px">
+      <div style="background:var(--s3);border:1px solid var(--border);border-radius:8px;padding:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:4px">📡 Tag NFC</div>
+            <div style="font-size:12px;color:var(--text3);line-height:1.5">${tagInfo}</div>
+          </div>
+          ${nfcSupported
+            ? `<button class="btn btn-sec btn-sm" onclick="closeModal();startNfcWrite('${equipId}')">${tagBtnLabel}</button>`
+            : `<span style="font-family:var(--font-m);font-size:11px;color:var(--text3)">NFC indisponibil pe acest dispozitiv</span>`
+          }
+        </div>
+      </div>
+
+      <div style="background:var(--s3);border:1px solid var(--border);border-radius:8px;padding:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:4px">📄 Raport PDF</div>
+            <div style="font-size:12px;color:var(--text3);line-height:1.5">Generează raportul de inspecție în format PDF, gata de printat sau arhivat.</div>
+          </div>
+          <button class="btn btn-sec btn-sm" onclick="generateInspectionPDF(db.inspections.find(i=>i.id==='${inspId}'), false)">📄 Descarcă PDF</button>
+        </div>
+      </div>
+
+      <div style="background:var(--s3);border:1px solid var(--border);border-radius:8px;padding:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:4px">📊 Export CSV</div>
+            <div style="font-size:12px;color:var(--text3);line-height:1.5">Date inspecție în format tabelar (echipament + checklist + verdict + observații).</div>
+          </div>
+          <button class="btn btn-sec btn-sm" onclick="exportInspectionCSV('${inspId}')">📊 Descarcă CSV</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+      <button class="btn btn-primary" onclick="closeModal()">Gata</button>
     </div>
   `;
+}
+
+// Per-inspection CSV export — exports a single inspection's data
+// (equipment metadata + checklist results + verdict + notes + photo count).
+function exportInspectionCSV(inspId) {
+  const ins = db.inspections.find(i => i.id === inspId);
+  if (!ins) { toast('Inspecție negăsită.', 'error'); return; }
+  const eq = db.equipment.find(e => e.id === ins.equipId) || {};
+
+  const verdictLabel = v => v==='ok'?'Aprobat' : v==='warn'?'Necesită atenție' : v==='fail'?'Respins' : '';
+  const checkLabel   = v => v==='ok'?'OK' : v==='warn'?'Atenție' : v==='fail'?'Respins' : 'Nebifat';
+
+  // Section 1: header info (key-value rows)
+  const headerRows = [
+    ['ID inspecție',         ins.id],
+    ['Data inspecției',      ins.date || ''],
+    ['Inspector',            ins.inspector || ''],
+    ['Nr. certificat',       ins.certNr || ''],
+    ['Verdict final',        verdictLabel(ins.verdict)],
+    ['Observații',           (ins.note || '').replace(/\r?\n/g, ' ')],
+    ['Nr. fotografii',       (ins.photos || []).length],
+    ['', ''],
+    ['── ECHIPAMENT ──',     ''],
+    ['ID echipament',        eq.id || ''],
+    ['Nume',                 eq.name || ''],
+    ['Tip',                  eq.type || ''],
+    ['Serial / S/N',         eq.serial || ''],
+    ['Producător',           eq.manufacturer || ''],
+    ['Model',                eq.model || ''],
+    ['Lot / Batch',          eq.lot || ''],
+    ['Normă',                eq.norm || ''],
+    ['Data fabricație',      eq.manufactureDate || ''],
+    ['Data primei utilizări',eq.purchaseDate || ''],
+    ['Durată viață maximă',  (eq.lifespan||'') + (eq.lifespan?' ani':'')],
+    ['Durată viață lucru',   (eq.workLifespan||'') + (eq.workLifespan?' ani':'')],
+    ['Locație',              eq.location || ''],
+    ['Proprietar',           eq.owner || ''],
+    ['', ''],
+    ['── PUNCTE DE VERIFICARE ──',''],
+  ];
+
+  const checkRows = Object.entries(ins.checks || {}).map(([k, v]) => [k, checkLabel(v)]);
+
+  const allRows = [...headerRows, ...checkRows];
+
+  const csvEscape = v => `"${(v ?? '').toString().replace(/"/g,'""')}"`;
+  const csvBody = allRows.map(r => r.map(csvEscape).join(',')).join('\r\n');
+  // BOM so Excel recognises UTF-8 (Romanian diacritics survive)
+  const csv = '\ufeff' + 'Câmp,Valoare\r\n' + csvBody;
+
+  const eqSlug = (eq.name || eq.id || 'echipament').replace(/[^\w-]+/g,'_').slice(0,40);
+  const dateSlug = (ins.date || new Date().toISOString().slice(0,10));
+  const filename = `inspectie_${eqSlug}_${dateSlug}_${ins.id}.csv`;
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 200);
+  toast('📊 CSV inspecție descărcat: ' + filename, 'success');
+}
+
+// Called from the "📡 Scrie NFC" button at the bottom of the inspection form.
+// If the inspection has an equipment selected, write its verification URL to a tag.
+function writeNfcFromInspection() {
+  const equipId = currentInspectEquipId || document.getElementById('insp-equip-sel')?.value;
+  if (!equipId) { toast('Selectează mai întâi un echipament.', 'error'); return; }
+  startNfcWrite(equipId);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -5299,15 +5411,66 @@ function handleScanResult(code) {
     return;
   }
 
-  // Equipment found — go directly to its fișă, which shows the latest inspection at the top.
-  // Show last-inspection summary in a non-intrusive toast so the user has feedback.
+  // Equipment found — show enriched summary card with equipment data + last inspection details
   const li = lastInspection(eq.id);
-  resultEl.style.display = 'none';
-  const insSummary = li
-    ? `ultima inspecție: ${formatDate(li.date)} (${li.verdict==='ok'?'OK':li.verdict==='warn'?'Atenție':li.verdict==='fail'?'Respins':'?'})`
-    : 'neinspectat încă';
-  toast(`✓ ${eq.name} — ${insSummary}`, 'success');
-  showDetail(eq.id);
+  const next = nextInspectionDate(eq.id);
+  resultEl.style.display = 'block';
+
+  const verdictLabel = v => v==='ok'?'✅ Aprobat' : v==='warn'?'⚠️ Necesită atenție' : v==='fail'?'❌ Respins' : '— Necunoscut';
+  const verdictColor = v => v==='ok'?'var(--green)' : v==='warn'?'var(--yellow)' : v==='fail'?'var(--red)' : 'var(--text3)';
+
+  const lastInsHtml = li ? `
+    <div style="background:var(--s3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+        <div style="font-family:var(--font-m);font-size:11px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase">Ultima inspecție</div>
+        <div style="font-family:var(--font-m);font-size:11px;color:${verdictColor(li.verdict)};font-weight:600">${verdictLabel(li.verdict)}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px;color:var(--text2);margin-bottom:${li.note||(li.photos&&li.photos.length)?'10px':'0'}">
+        <div><span style="color:var(--text3)">Data: </span>${formatDate(li.date)}</div>
+        <div><span style="color:var(--text3)">Inspector: </span>${li.inspector||'—'}</div>
+        ${li.certNr ? `<div><span style="color:var(--text3)">Certificat: </span>${li.certNr}</div>` : ''}
+        <div><span style="color:var(--text3)">Următoarea: </span>${next ? formatDate(next) : '—'}</div>
+      </div>
+      ${li.note ? `<div style="font-size:12px;color:var(--text2);padding:8px;background:var(--s2);border-radius:6px;margin-bottom:${(li.photos&&li.photos.length)?'10px':'0'}">📝 ${li.note}</div>` : ''}
+      ${(li.photos && li.photos.length) ? `
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${li.photos.slice(0,6).map((p,i)=>`<img src="${p.data}" style="width:54px;height:54px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:pointer" onclick="openLightbox('${li.id}',${i})" title="${p.label||'Foto '+(i+1)}">`).join('')}
+          ${li.photos.length>6 ? `<div style="width:54px;height:54px;display:flex;align-items:center;justify-content:center;background:var(--s2);border-radius:4px;border:1px solid var(--border);font-size:11px;color:var(--text3);font-family:var(--font-m)">+${li.photos.length-6}</div>` : ''}
+        </div>` : ''}
+    </div>
+  ` : `
+    <div style="background:var(--s3);border:1px dashed var(--border);border-radius:8px;padding:14px;margin-top:14px;text-align:center;color:var(--yellow);font-size:13px">
+      ⚠️ Niciun raport de inspecție încă pentru acest echipament.
+    </div>
+  `;
+
+  resultEl.innerHTML = `
+    <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:20px">
+      <div style="font-family:var(--font-m);font-size:11px;color:var(--green);margin-bottom:8px">✓ ECHIPAMENT IDENTIFICAT</div>
+      <div style="font-family:var(--font-h);font-size:22px;font-weight:700;margin-bottom:4px">${eq.name}</div>
+      <div style="font-family:var(--font-m);font-size:11px;color:var(--text3);margin-bottom:12px">${eq.serial} &nbsp;|&nbsp; ID: ${eq.id} &nbsp;|&nbsp; ${eq.type}</div>
+      <div class="d-flex" style="margin-bottom:12px;flex-wrap:wrap">
+        ${statusBadge(eq.status)}
+        ${eq.nfcTagWritten ? `<span style="font-family:var(--font-m);font-size:11px;color:var(--blue)">📡 NFC ${eq.nfcTagWritten}</span>` : ''}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px;color:var(--text2);margin-bottom:8px">
+        <div><span style="color:var(--text3)">Producător: </span>${eq.manufacturer||'—'}</div>
+        <div><span style="color:var(--text3)">Model: </span>${eq.model||'—'}</div>
+        <div><span style="color:var(--text3)">Normă: </span>${eq.norm||'—'}</div>
+        ${eq.lot ? `<div><span style="color:var(--text3)">Lot: </span>${eq.lot}</div>` : ''}
+        <div><span style="color:var(--text3)">Proprietar: </span>${eq.owner||'—'}</div>
+        <div><span style="color:var(--text3)">Locație: </span>${eq.location||'—'}</div>
+      </div>
+      ${lastInsHtml}
+      <div class="d-flex" style="margin-top:16px;flex-wrap:wrap;gap:8px">
+        <button class="btn btn-primary" onclick="renderInspectForm('${eq.id}');showPage('inspect-new')">＋ Inspectează din nou</button>
+        <button class="btn btn-sec" onclick="showDetail('${eq.id}')">📋 Fișă completă</button>
+        ${('NDEFReader' in window) ? `<button class="btn btn-sec btn-sm" onclick="startNfcWrite('${eq.id}')">📡 Rescrie tag</button>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('scan-result').style.display='none';document.getElementById('scan-idle').style.display='block'">Scanare nouă</button>
+      </div>
+    </div>`;
+
+  toast('Echipament identificat: ' + eq.name, 'success');
 }
 
 function checkCameraSupport() {
@@ -6609,11 +6772,16 @@ async function generateInspectionPDF(ins, returnBase64 = false) {
     setFont(8, 'normal', [20, 20, 30]);
     txt(String(val || '—'), x + lw, ty);
   }
-  function triLabel(lbl1, lbl2, lbl3, x, ty, color = DGRAY) {
+  function triLabel(en, de, ro, x, ty, color = DGRAY) {
+    // English = primary (bold, slightly larger)
+    setFont(6.5, 'bold', color);
+    txt(en, x, ty);
+    // German = secondary
     setFont(5.5, 'normal', color);
-    txt(lbl1, x, ty);
-    txt(lbl2, x, ty + 3.2);
-    txt(lbl3, x, ty + 6.4);
+    txt(de, x, ty + 3.3);
+    // Romanian = tertiary
+    setFont(5.5, 'italic', [120, 130, 145]);
+    txt(ro, x, ty + 6.4);
   }
   function sectionHeader(title, sub1, sub2, sy) {
     fillRect(M, sy, cw, 7, NAVY);
@@ -6656,87 +6824,89 @@ async function generateInspectionPDF(ins, returnBase64 = false) {
 
   // Form ref right side
   setFont(6.5, 'normal', [180, 200, 220]);
-  txt('FORMULAR: SSH-PPE-CHK-02  ·  REV: 2.0', W - M, 10, { align: 'right' });
-  txt('AUSGABEDATUM / ISSUE DATE: 01.01.2026', W - M, 14.5, { align: 'right' });
+  txt('FORM: SSH-PPE-CHK-02  ·  REV: 2.0', W - M, 10, { align: 'right' });
+  txt('ISSUE DATE / AUSGABEDATUM: 01.01.2026', W - M, 14.5, { align: 'right' });
 
-  // Title block
-  fillRect(M, 21, cw, 10, ORANGE);
+  // Title block — taller to fit subtitle inside cleanly
+  fillRect(M, 21, cw, 13, ORANGE);
   setFont(11, 'bold', WHITE);
-  txt('PSA-PRÜFPROTOKOLL  /  RAPORT DE INSPECTIE PSA  /  PPE INSPECTION RECORD', M + 3, 27.5);
-  setFont(7, 'normal', WHITE);
-  txt('Persönliche Schutzausrüstung  ·  Echipament Individual de Protectie  ·  Personal Protective Equipment  |  EN 365 · DGUV R 112-198/199', M + 3, 31.8);
+  txt('PPE INSPECTION RECORD  /  PSA-PRÜFPROTOKOLL  /  RAPORT DE INSPECTIE EIP', M + 3, 27);
+  setFont(6.8, 'normal', WHITE);
+  txt('Personal Protective Equipment  ·  Persönliche Schutzausrüstung  ·  Echipament Individual de Protectie  |  EN 365 · DGUV R 112-198/199', M + 3, 31.8);
 
-  y = 36;
+  y = 38;
 
   // ══════════════════════════════════════════════════════
-  // SECTION 1 — IDENTIFICARE ECHIPAMENT
+  // SECTION 1 — EQUIPMENT IDENTIFICATION
   // ══════════════════════════════════════════════════════
-  y = sectionHeader('1  IDENTIFIZIERUNG / IDENTIFICARE / EQUIPMENT IDENTIFICATION', null, null, y);
+  y = sectionHeader('1  EQUIPMENT IDENTIFICATION / IDENTIFIZIERUNG / IDENTIFICARE ECHIPAMENT', null, null, y);
 
-  // Row 1: Typ | Modell | Hersteller
+  // Row 1: Type | Model | Manufacturer
   const col3 = cw / 3;
+  const ROWH = 17; // taller rows to prevent label/value overlap
   const cells1 = [
-    { ro: 'TIP ECHIPAMENT', de: 'Gerätetyp', en: 'Equipment type', val: eq.type || '' },
-    { ro: 'MODEL', de: 'Modell', en: 'Model', val: (eq.manufacturer || '') + ' ' + (eq.model || '') },
-    { ro: 'PRODUCATOR', de: 'Hersteller', en: 'Manufacturer', val: eq.manufacturer || '' },
+    { en: 'EQUIPMENT TYPE',   de: 'Gerätetyp',     ro: 'Tip echipament',   val: eq.type || '' },
+    { en: 'MODEL',            de: 'Modell',        ro: 'Model',            val: (eq.manufacturer || '') + ' ' + (eq.model || '') },
+    { en: 'MANUFACTURER',     de: 'Hersteller',    ro: 'Producator',       val: eq.manufacturer || '' },
   ];
   cells1.forEach((c, i) => {
     const cx = M + i * col3;
-    fillRect(cx, y, col3 - 0.5, 14, i % 2 === 0 ? LGRAY : WHITE);
-    drawRect(cx, y, col3 - 0.5, 14, MGRAY);
-    triLabel(c.ro, c.de, c.en, cx + 2, y + 4, DGRAY);
+    fillRect(cx, y, col3 - 0.5, ROWH, i % 2 === 0 ? LGRAY : WHITE);
+    drawRect(cx, y, col3 - 0.5, ROWH, MGRAY);
+    triLabel(c.en, c.de, c.ro, cx + 2, y + 4, DGRAY);
     setFont(8.5, 'bold', [20, 20, 30]);
-    txt(c.val, cx + 2, y + 12);
+    txt(c.val, cx + 2, y + ROWH - 2);
   });
-  y += 15;
+  y += ROWH + 1;
 
-  // Row 2: Serie | Data fabricatie | Data primei utilizari
+  // Row 2: Serial | Manufacture date | First use date
   const cells2 = [
-    { ro: 'NR. SERIE / S/N', de: 'Seriennummer', en: 'Serial / inventory no.', val: eq.serial || '' },
-    { ro: 'DATA FABRICATIEI', de: 'Herstellungsdatum', en: 'Manufacture date', val: eq.manufactureDate ? formatDate(eq.manufactureDate) : '—' },
-    { ro: 'DATA PRIMEI UTILIZARI', de: 'Erstnutzungsdatum', en: 'First use date', val: eq.purchaseDate ? formatDate(eq.purchaseDate) : '—' },
+    { en: 'SERIAL / INVENTORY NO.', de: 'Seriennummer',      ro: 'Nr. serie / S/N',     val: eq.serial || '' },
+    { en: 'MANUFACTURE DATE',       de: 'Herstellungsdatum', ro: 'Data fabricatiei',    val: eq.manufactureDate ? formatDate(eq.manufactureDate) : '—' },
+    { en: 'FIRST USE DATE',         de: 'Erstnutzungsdatum', ro: 'Data primei utilizari', val: eq.purchaseDate ? formatDate(eq.purchaseDate) : '—' },
   ];
   cells2.forEach((c, i) => {
     const cx = M + i * col3;
-    fillRect(cx, y, col3 - 0.5, 14, i % 2 === 0 ? LGRAY : WHITE);
-    drawRect(cx, y, col3 - 0.5, 14, MGRAY);
-    triLabel(c.ro, c.de, c.en, cx + 2, y + 4, DGRAY);
+    fillRect(cx, y, col3 - 0.5, ROWH, i % 2 === 0 ? LGRAY : WHITE);
+    drawRect(cx, y, col3 - 0.5, ROWH, MGRAY);
+    triLabel(c.en, c.de, c.ro, cx + 2, y + 4, DGRAY);
     setFont(8.5, 'bold', [20, 20, 30]);
-    txt(c.val, cx + 2, y + 12);
+    txt(c.val, cx + 2, y + ROWH - 2);
   });
-  y += 15;
+  y += ROWH + 1;
 
-  // Row 3: Durata viata | Norma | Lot | Utilizator | Locatie
+  // Row 3: Max/working lifespan | Standard | Batch | User | Location — 5 narrow cells
   const col5w = cw / 5;
-  const lifespanVal = (eq.lifespan || '10') + (eq.workLifespan ? ' / ' + eq.workLifespan : '') + ' ani';
+  const ROWH5 = 19; // even taller since cells are narrower
+  const lifespanVal = (eq.lifespan || '10') + (eq.workLifespan ? ' / ' + eq.workLifespan : '') + ' y';
   const cells3 = [
-    { ro: 'DURATA VIATA MAX/LUCRU', de: 'Max./Einsatz Nutzungsdauer', en: 'Max./working lifespan', val: lifespanVal },
-    { ro: 'NORMA EN', de: 'Angewandte Norm', en: 'Applicable standard', val: eq.norm || '' },
-    { ro: 'LOT / BATCH', de: 'Charge', en: 'Batch no.', val: eq.lot || '' },
-    { ro: 'UTILIZATOR', de: 'Zugeordneter Nutzer', en: 'Assigned user', val: eq.owner || '' },
-    { ro: 'LOCATIE', de: 'Lagerort', en: 'Storage location', val: eq.location || '' },
+    { en: 'MAX / WORKING LIFE',  de: 'Max./Einsatz-Dauer', ro: 'Durata viata max/lucru', val: lifespanVal },
+    { en: 'APPLICABLE STANDARD', de: 'Angewandte Norm',    ro: 'Norma EN',               val: eq.norm || '' },
+    { en: 'BATCH NO.',           de: 'Charge',             ro: 'Lot / Batch',            val: eq.lot || '' },
+    { en: 'ASSIGNED USER',       de: 'Zugeordneter Nutzer',ro: 'Utilizator',             val: eq.owner || '' },
+    { en: 'STORAGE LOCATION',    de: 'Lagerort',           ro: 'Locatie',                val: eq.location || '' },
   ];
   cells3.forEach((c, i) => {
     const cx = M + i * col5w;
-    fillRect(cx, y, col5w - 0.5, 14, i % 2 === 0 ? LGRAY : WHITE);
-    drawRect(cx, y, col5w - 0.5, 14, MGRAY);
-    triLabel(c.ro, c.de, c.en, cx + 1.5, y + 4, DGRAY);
+    fillRect(cx, y, col5w - 0.5, ROWH5, i % 2 === 0 ? LGRAY : WHITE);
+    drawRect(cx, y, col5w - 0.5, ROWH5, MGRAY);
+    triLabel(c.en, c.de, c.ro, cx + 1.5, y + 4, DGRAY);
     setFont(7.5, 'bold', [20, 20, 30]);
     const maxW = col5w - 4;
     const lines = doc.splitTextToSize(c.val, maxW);
-    txt(lines[0] || '', cx + 1.5, y + 12);
+    txt(lines[0] || '', cx + 1.5, y + ROWH5 - 2);
   });
-  y += 16;
+  y += ROWH5 + 2;
 
   // ══════════════════════════════════════════════════════
-  // SECTION 2 — VERIFICARE COMPONENTE
+  // SECTION 2 — COMPONENT INSPECTION
   // ══════════════════════════════════════════════════════
   needsPage(80);
-  y = sectionHeader('2  PRÜFUNG / VERIFICARE COMPONENTE / COMPONENT INSPECTION', null, null, y);
+  y = sectionHeader('2  COMPONENT INSPECTION / PRÜFUNG / VERIFICARE COMPONENTE', null, null, y);
 
-  // Instruction line
+  // Instruction line — EN / DE / RO
   setFont(6.5, 'italic', DGRAY);
-  txt('OK = fara defecte / ohne Mängel / no defects  ·  NOK = defect constatat / Mängel / defect found  ·  (!) = observatie / Bemerkung / note', M, y + 3.5);
+  txt('OK = no defects / ohne Mängel / fara defecte  ·  NOK = defect found / Mängel / defect constatat  ·  (!) = note / Bemerkung / observatie', M, y + 3.5);
   y += 7;
 
   // Table header
@@ -6745,11 +6915,11 @@ async function generateInspectionPDF(ins, returnBase64 = false) {
   fillRect(M, y, cw, 7, NAVY);
   setFont(6.5, 'bold', WHITE);
   const headers = [
-    { t: 'COMPONENTA / Komponente / Component', w: colW.comp },
-    { t: 'CRITERIU / Prüfkriterium / Inspection criterion', w: colW.crit },
+    { t: 'COMPONENT / Komponente / Componenta', w: colW.comp },
+    { t: 'INSPECTION CRITERION / Prüfkriterium / Criteriu', w: colW.crit },
     { t: 'OK', w: colW.ok },
     { t: 'NOK', w: colW.nok },
-    { t: 'OBS / Bem / Note', w: colW.note },
+    { t: 'NOTE / Bemerkung / Obs', w: colW.note },
   ];
   headers.forEach(h => {
     txt(h.t, cx2 + 1.5, y + 4.8);
@@ -6761,20 +6931,20 @@ async function generateInspectionPDF(ins, returnBase64 = false) {
   const checkItems = ins.checks || {};
   const checkKeys = Object.keys(checkItems);
 
-  // Group by component type based on equipment type
+  // Group by component type based on equipment type — labels EN / DE / RO
   const COMP_MAP = {
-    'Ham': 'GURT (EN 361) / Ham',
-    'Carabiniera': 'VERBINDUNGSELEMENTE (EN 362) / Carabiniera',
-    'Coarda statica': 'SEIL (EN 1891) / Coarda statica',
-    'Coarda dinamica': 'SEIL (EN 892) / Coarda dinamica',
-    'Casca': 'HELM (EN 397/12492) / Casca',
-    'Longa pozitionare': 'VERBINDUNGSMITTEL (EN 354/358) / Longa',
-    'Longa Y / Amortizor': 'VERBINDUNGSMITTEL + FALLDÄMPFER (EN 354/355) / Longa Y',
-    'Dispozitiv anticadere': 'MITLAUFENDES AUFFANGGERÄT (EN 360) / Anticadere',
-    'Scripete': 'SEILROLLE (EN 12278) / Scripete',
-    'Bucla / Anel': 'BANDSCHLINGE (EN 566) / Bucla',
+    'Ham':                  'HARNESS / Gurt (EN 361) / Ham',
+    'Carabiniera':          'CONNECTOR / Verbindungselemente (EN 362) / Carabiniera',
+    'Coarda statica':       'ROPE / Seil (EN 1891) / Coarda statica',
+    'Coarda dinamica':      'ROPE / Seil (EN 892) / Coarda dinamica',
+    'Casca':                'HELMET / Helm (EN 397/12492) / Casca',
+    'Longa pozitionare':    'LANYARD / Verbindungsmittel (EN 354/358) / Longa',
+    'Longa Y / Amortizor':  'LANYARD + SHOCK ABSORBER / Verbindungsmittel + Falldämpfer (EN 354/355) / Longa Y',
+    'Dispozitiv anticadere':'FALL ARRESTER / Mitlaufendes Auffanggerät (EN 360) / Anticadere',
+    'Scripete':             'PULLEY / Seilrolle (EN 12278) / Scripete',
+    'Bucla / Anel':         'SLING / Bandschlinge (EN 566) / Bucla',
   };
-  const compName = COMP_MAP[eq.type] || ('ECHIPAMENT / Ausrüstung / Equipment (' + (eq.type || '') + ')');
+  const compName = COMP_MAP[eq.type] || ('EQUIPMENT / Ausrüstung / Echipament (' + (eq.type || '') + ')');
 
   let rowBg = true;
   checkKeys.forEach((check, idx) => {
@@ -6831,80 +7001,85 @@ async function generateInspectionPDF(ins, returnBase64 = false) {
     fillRect(M, y, cw, 10, LGRAY);
     drawRect(M, y, cw, 10, MGRAY);
     setFont(8, 'italic', DGRAY);
-    txt('Niciun criteriu verificat / Keine Prüfkriterien / No inspection criteria recorded', M + 3, y + 6.5);
+    txt('No inspection criteria recorded / Keine Prüfkriterien / Niciun criteriu verificat', M + 3, y + 6.5);
     y += 11;
   }
 
   y += 3;
 
   // ══════════════════════════════════════════════════════
-  // SECTION 3 — CRITERII OBLIGATORII DE RETRAGERE
+  // SECTION 3 — MANDATORY WITHDRAWAL CRITERIA
   // ══════════════════════════════════════════════════════
   needsPage(75);
-  y = sectionHeader('3  PFLICHTKRITERIEN / CRITERII RETRAGERE / MANDATORY WITHDRAWAL CRITERIA', null, null, y);
+  y = sectionHeader('3  MANDATORY WITHDRAWAL CRITERIA / PFLICHTKRITERIEN / CRITERII OBLIGATORII DE RETRAGERE', null, null, y);
 
   const withdrawalCriteria = [
-    'Echipamentul a oprit o cadere (chiar si fara defecte vizibile) / Equipment has arrested a fall',
-    'Amortizor de soc declansat (banda interioara vizibila, capac rupt) / Energy absorber deployed',
-    'Benzi cu taieturi, fire rupte, decolorare severa sau abraziune grea / Webbing with cuts, broken threads, severe discoloration',
-    'Cusaturi rupte, fire proeminente sau zone slabite / Torn stitching, protruding threads or weakened areas',
-    'Conectori/carabiniere cu deformari, fisuri sau coroziune severa / Connectors with deformations, cracks or severe corrosion',
-    'Mecanismul de blocare nu se inchide complet sau este blocat / Locking mechanism does not close completely',
-    'Marcajele producatorului absente sau ilizibile / Manufacturer marking absent or illegible',
-    'Echipament expus la chimicale, foc sau temperaturi peste 60°C / Equipment exposed to chemicals, fire or >60°C',
-    'Durata de viata maxima depasita / Maximum lifespan exceeded',
-    'Defect functional la inspectie / Functional defect during inspection',
+    'Equipment has arrested a fall (even without visible defects) / Gerät hat einen Sturz aufgefangen / Echipamentul a oprit o cadere',
+    'Energy absorber deployed (inner webbing visible, torn cover) / Falldämpfer ausgelöst / Amortizor de soc declansat',
+    'Webbing with cuts, broken threads, severe discoloration or heavy abrasion / Gurtband mit Schnitten, gebrochenen Fäden oder starkem Abrieb / Benzi cu taieturi, fire rupte sau abraziune grea',
+    'Torn stitching, protruding threads or weakened areas / Gerissene Nähte / Cusaturi rupte sau fire proeminente',
+    'Connectors with deformations, cracks or severe corrosion / Verbinder mit Verformungen, Rissen oder starker Korrosion / Conectori cu deformari sau coroziune severa',
+    'Locking mechanism does not close completely or is jammed / Verschluss schließt nicht vollständig oder ist blockiert / Mecanismul de blocare nu se inchide complet',
+    'Manufacturer marking absent or illegible / Herstellerkennzeichnung fehlt oder unleserlich / Marcajele producatorului absente sau ilizibile',
+    'Equipment exposed to chemicals, fire or temperatures over 60°C / Ausrüstung Chemikalien, Feuer oder >60°C ausgesetzt / Echipament expus la chimicale, foc sau >60°C',
+    'Maximum lifespan exceeded / Maximale Nutzungsdauer überschritten / Durata de viata maxima depasita',
+    'Functional defect during inspection / Funktionsfehler bei der Prüfung / Defect functional la inspectie',
   ];
 
   setFont(6.5, 'bold', RED);
-  txt('DACA UN CRITERIU ESTE INDEPLINIT — RETRAGERE IMEDIATA DIN UZ  /  If any criterion applies — withdraw from use immediately', M + 1, y + 3);
+  txt('IF ANY CRITERION APPLIES — WITHDRAW FROM USE IMMEDIATELY  /  Bei Erfüllung eines Kriteriums — sofort aussortieren  /  La indeplinirea unui criteriu — retragere imediata', M + 1, y + 3);
   y += 6;
 
   withdrawalCriteria.forEach((crit, i) => {
-    needsPage(8);
+    const ROW = 11; // taller to fit two lines of trilingual text
+    needsPage(ROW + 1);
     const wdrChecked = ins.withdrawal && ins.withdrawal[i];
-    fillRect(M, y, cw, 7.5, wdrChecked ? [255,245,245] : (i % 2 === 0 ? LGRAY : WHITE));
-    drawRect(M, y, cw, 7.5, wdrChecked ? RED : MGRAY);
-    checkBox(M + 2, y + 5.2, wdrChecked, RED);
-    setFont(7, 'normal', [25, 25, 35]);
+    fillRect(M, y, cw, ROW, wdrChecked ? [255,245,245] : (i % 2 === 0 ? LGRAY : WHITE));
+    drawRect(M, y, cw, ROW, wdrChecked ? RED : MGRAY);
+    checkBox(M + 2, y + 4.5, wdrChecked, RED);
+    setFont(6.5, 'normal', [25, 25, 35]);
     const lines = doc.splitTextToSize(crit, cw - 12);
-    txt(lines[0], M + 8, y + 5.2);
-    y += 7.5;
+    txt(lines[0] || '', M + 8, y + 4.3);
+    if (lines[1]) {
+      setFont(6, 'normal', DGRAY);
+      txt(lines[1], M + 8, y + 8.3);
+    }
+    y += ROW;
   });
   y += 4;
 
   // ══════════════════════════════════════════════════════
-  // SECTION 4 — VERDICT FINAL
+  // SECTION 4 — FINAL VERDICT
   // ══════════════════════════════════════════════════════
   needsPage(35);
-  y = sectionHeader('4  ENDGÜLTIGES URTEIL / VERDICT FINAL / FINAL VERDICT', null, null, y);
+  y = sectionHeader('4  FINAL VERDICT / ENDGÜLTIGES URTEIL / VERDICT FINAL', null, null, y);
 
   const verdictW = cw / 3;
   const verdicts = [
-    { key: 'ok',   ro: 'GEBRAUCHSTAUGLICH', de: 'ADECVAT UTILIZARII', en: 'FIT FOR USE',        icon: '✓', color: GREEN },
-    { key: 'warn', ro: 'REPARABEL',          de: 'NECESITA REMEDIERE', en: 'REPAIRABLE',          icon: '⚠', color: YELLOW },
-    { key: 'fail', ro: 'AUSSORTIERT',        de: 'RETRAS DIN UZ',      en: 'WITHDRAWN FROM USE', icon: '✕', color: RED },
+    { key: 'ok',   en: 'FIT FOR USE',        de: 'GEBRAUCHSTAUGLICH', ro: 'ADECVAT UTILIZARII',  icon: '✓', color: GREEN },
+    { key: 'warn', en: 'REPAIRABLE',         de: 'REPARABEL',         ro: 'NECESITA REMEDIERE',  icon: '⚠', color: YELLOW },
+    { key: 'fail', en: 'WITHDRAWN FROM USE', de: 'AUSSORTIERT',       ro: 'RETRAS DIN UZ',       icon: '✕', color: RED },
   ];
 
   verdicts.forEach((v, i) => {
     const vx = M + i * verdictW;
     const isActive = ins.verdict === v.key;
-    fillRect(vx, y, verdictW - 1, 18, isActive ? v.color : LGRAY);
-    drawRect(vx, y, verdictW - 1, 18, isActive ? v.color : MGRAY, isActive ? 1.2 : 0.3);
-    setFont(16, 'bold', isActive ? WHITE : MGRAY);
-    txt(v.icon, vx + verdictW / 2 - 4, y + 10, { align: 'center' });
-    setFont(7, 'bold', isActive ? WHITE : DGRAY);
-    txt(v.ro, vx + verdictW / 2, y + 13.5, { align: 'center' });
-    setFont(6, 'normal', isActive ? [220, 235, 255] : [160, 165, 175]);
-    txt(v.de + '  /  ' + v.en, vx + verdictW / 2, y + 17, { align: 'center' });
+    fillRect(vx, y, verdictW - 1, 20, isActive ? v.color : LGRAY);
+    drawRect(vx, y, verdictW - 1, 20, isActive ? v.color : MGRAY, isActive ? 1.2 : 0.3);
+    setFont(15, 'bold', isActive ? WHITE : MGRAY);
+    txt(v.icon, vx + verdictW / 2, y + 9, { align: 'center' });
+    setFont(7.5, 'bold', isActive ? WHITE : DGRAY);
+    txt(v.en, vx + verdictW / 2, y + 13.5, { align: 'center' });
+    setFont(5.8, 'normal', isActive ? [220, 235, 255] : [160, 165, 175]);
+    txt(v.de + '  ·  ' + v.ro, vx + verdictW / 2, y + 17.5, { align: 'center' });
   });
-  y += 20;
+  y += 22;
 
-  // Observations box
+  // Observations box — EN/DE/RO order
   needsPage(28);
   fillRect(M, y, cw, 5, NAVY);
   setFont(7.5, 'bold', WHITE);
-  txt('OBSERVATII / BEMERKUNGEN / OBSERVATIONS  &  MASURI CORECTIVE / CORRECTIVE ACTIONS', M + 2, y + 3.5);
+  txt('OBSERVATIONS & CORRECTIVE ACTIONS / Bemerkungen & Maßnahmen / Observatii & Masuri Corective', M + 2, y + 3.5);
   y += 6;
   fillRect(M, y, cw, 20, LGRAY);
   drawRect(M, y, cw, 20, MGRAY);
@@ -6916,71 +7091,77 @@ async function generateInspectionPDF(ins, returnBase64 = false) {
   y += 22;
 
   // ══════════════════════════════════════════════════════
-  // SECTION 5 — INSPECTOR & SEMNATURA
+  // SECTION 5 — INSPECTION DATE & SIGNATURE
   // ══════════════════════════════════════════════════════
-  needsPage(40);
-  y = sectionHeader('5  PRÜFDATUM & UNTERSCHRIFT / DATA SI SEMNATURA / INSPECTION DATE & SIGNATURE', null, null, y);
+  needsPage(45);
+  y = sectionHeader('5  INSPECTION DATE & SIGNATURE / PRÜFDATUM & UNTERSCHRIFT / DATA SI SEMNATURA', null, null, y);
 
-  // Row: data inspectie | data eticheta | urmatoarea
+  // Row: inspection date | label date code | next inspection
   const col3d = cw / 3;
   const dateFields = [
-    { ro: 'DATA INSPECTIEI', de: 'Prüfdatum', en: 'Inspection date', val: ins.date ? formatDate(ins.date) : '—' },
-    { ro: 'COD DATA ETICHETA', de: 'Etikett-Datumscode', en: 'Label date code', val: ins.date ? (new Date(ins.date).getMonth() + 1).toString().padStart(2,'0') + ' · ' + new Date(ins.date).getFullYear() : '—' },
-    { ro: 'URMATOAREA INSPECTIE', de: 'Nächstes Prüfdatum', en: 'Next inspection date', val: (() => { if (!ins.date) return '—'; const d = new Date(ins.date); d.setFullYear(d.getFullYear() + 1); return formatDate(d.toISOString().slice(0,10)); })() },
+    { en: 'INSPECTION DATE',      de: 'Prüfdatum',          ro: 'Data inspectiei',       val: ins.date ? formatDate(ins.date) : '—' },
+    { en: 'LABEL DATE CODE',      de: 'Etikett-Datumscode', ro: 'Cod data eticheta',     val: ins.date ? (new Date(ins.date).getMonth() + 1).toString().padStart(2,'0') + ' · ' + new Date(ins.date).getFullYear() : '—' },
+    { en: 'NEXT INSPECTION DATE', de: 'Nächstes Prüfdatum', ro: 'Urmatoarea inspectie',  val: (() => { if (!ins.date) return '—'; const d = new Date(ins.date); d.setFullYear(d.getFullYear() + 1); return formatDate(d.toISOString().slice(0,10)); })() },
   ];
   dateFields.forEach((c, i) => {
     const dcx = M + i * col3d;
-    fillRect(dcx, y, col3d - 0.5, 14, i % 2 === 0 ? LGRAY : WHITE);
-    drawRect(dcx, y, col3d - 0.5, 14, MGRAY);
-    triLabel(c.ro, c.de, c.en, dcx + 2, y + 4, DGRAY);
+    fillRect(dcx, y, col3d - 0.5, 17, i % 2 === 0 ? LGRAY : WHITE);
+    drawRect(dcx, y, col3d - 0.5, 17, MGRAY);
+    triLabel(c.en, c.de, c.ro, dcx + 2, y + 4, DGRAY);
     setFont(9, 'bold', [20, 20, 30]);
-    txt(c.val, dcx + 2, y + 12);
+    txt(c.val, dcx + 2, y + 15);
   });
-  y += 15;
+  y += 18;
 
-  // Row: inspector | certificare | semnatura
+  // Row: inspector | certification | signature
   const sigFields = [
-    { ro: 'INSPECTOR (NUME)', de: 'Prüfer (Name)', en: 'Inspector (name)', val: ins.inspector || '' },
-    { ro: 'NR. CERTIFICARE', de: 'Zertifizierung Nr.', en: 'Certification no.', val: ins.certNr || '' },
-    { ro: 'SEMNATURA', de: 'Unterschrift', en: 'Signature', val: '' },
+    { en: 'INSPECTOR (NAME)',  de: 'Prüfer (Name)',     ro: 'Inspector (nume)',    val: ins.inspector || '' },
+    { en: 'CERTIFICATION NO.', de: 'Zertifizierung Nr.', ro: 'Nr. certificare',    val: ins.certNr || '' },
+    { en: 'SIGNATURE',         de: 'Unterschrift',      ro: 'Semnatura',           val: '' },
   ];
   sigFields.forEach((c, i) => {
     const scx = M + i * col3d;
-    fillRect(scx, y, col3d - 0.5, 16, i % 2 === 0 ? LGRAY : WHITE);
-    drawRect(scx, y, col3d - 0.5, 16, MGRAY);
-    triLabel(c.ro, c.de, c.en, scx + 2, y + 4, DGRAY);
+    fillRect(scx, y, col3d - 0.5, 18, i % 2 === 0 ? LGRAY : WHITE);
+    drawRect(scx, y, col3d - 0.5, 18, MGRAY);
+    triLabel(c.en, c.de, c.ro, scx + 2, y + 4, DGRAY);
     if (c.val) {
       setFont(9, 'bold', NAVY);
-      txt(c.val, scx + 2, y + 13);
+      txt(c.val, scx + 2, y + 16);
     } else {
       // Signature line
       doc.setDrawColor(...MGRAY);
       doc.setLineWidth(0.4);
-      doc.line(scx + 4, y + 13, scx + col3d - 6, y + 13);
+      doc.line(scx + 4, y + 15, scx + col3d - 6, y + 15);
     }
   });
-  y += 18;
+  y += 20;
 
   // ══════════════════════════════════════════════════════
-  // NOTE / HINWEIS
+  // NOTE / HINWEIS — EN primary
   // ══════════════════════════════════════════════════════
-  needsPage(22);
-  fillRect(M, y, cw, 18, [248, 248, 250]);
-  drawRect(M, y, cw, 18, MGRAY);
+  needsPage(24);
+  fillRect(M, y, cw, 20, [248, 248, 250]);
+  drawRect(M, y, cw, 20, MGRAY);
   doc.setDrawColor(...ORANGE);
   doc.setLineWidth(1.2);
-  doc.line(M, y, M, y + 18);
+  doc.line(M, y, M, y + 20);
   setFont(6.5, 'bold', ORANGE);
-  txt('HINWEIS / NOTA / NOTE', M + 3, y + 5);
+  txt('NOTE / HINWEIS / NOTA', M + 3, y + 5);
+  setFont(6, 'normal', [25, 25, 35]);
+  const noteEN = 'EN: The date label (Ø 10mm) with the next inspection date is applied only if verdict is FIT FOR USE. WITHDRAWN equipment receives the red OUT OF SERVICE label immediately and is isolated.';
   setFont(6, 'normal', DGRAY);
-  const noteText = 'DE: Das Datumsetikett (Ø 10mm) mit dem nächsten Prüfdatum wird nur bei Urteil GEBRAUCHSTAUGLICH angebracht. AUSSORTIERTE Ausrüstung erhält sofort das rote SCOS-Etikett und wird isoliert.';
-  const noteText2 = 'RO: Eticheta de data se aplica doar la verdict ADECVAT UTILIZARII. Echipamentul RETRAS primeste imediat eticheta rosie SCOS DIN UZ si se izoleaza.  |  EN: Date label applied only if FIT FOR USE. WITHDRAWN equipment receives red OUT OF SERVICE label immediately.';
-  const nLines1 = doc.splitTextToSize(noteText, cw - 6);
-  const nLines2 = doc.splitTextToSize(noteText2, cw - 6);
-  txt(nLines1[0] || '', M + 3, y + 9.5);
-  txt(nLines2[0] || '', M + 3, y + 13.5);
-  if (nLines2[1]) txt(nLines2[1], M + 3, y + 16.5);
-  y += 20;
+  const noteDE = 'DE: Das Datumsetikett (Ø 10mm) mit dem nächsten Prüfdatum wird nur bei Urteil GEBRAUCHSTAUGLICH angebracht. AUSSORTIERTE Ausrüstung erhält sofort das rote SCOS-Etikett und wird isoliert.';
+  const noteRO = 'RO: Eticheta de data se aplica doar la verdict ADECVAT UTILIZARII. Echipamentul RETRAS primeste imediat eticheta rosie SCOS DIN UZ si se izoleaza.';
+  const lEN = doc.splitTextToSize(noteEN, cw - 6);
+  const lDE = doc.splitTextToSize(noteDE, cw - 6);
+  const lRO = doc.splitTextToSize(noteRO, cw - 6);
+  setFont(6, 'normal', [25, 25, 35]);
+  txt(lEN[0] || '', M + 3, y + 9);
+  setFont(6, 'normal', DGRAY);
+  txt(lDE[0] || '', M + 3, y + 13);
+  setFont(6, 'italic', [120, 130, 145]);
+  txt(lRO[0] || '', M + 3, y + 17);
+  y += 22;
 
   // ══════════════════════════════════════════════════════
   // FOOTER
@@ -6990,7 +7171,7 @@ async function generateInspectionPDF(ins, returnBase64 = false) {
   setFont(6.5, 'normal', [180, 200, 220]);
   txt('SicherShield SRL  ·  CUI RO12345678  ·  J40/12345/2024  ·  www.sichershield.ro', W / 2, y + 8.5, { align: 'center' });
   setFont(6, 'normal', [120, 140, 160]);
-  txt('Aufbewahrung 10 Jahre · Pastrare 10 ani · Retain 10 years (EN 365)', W / 2, y + 13, { align: 'center' });
+  txt('Retain 10 years · Aufbewahrung 10 Jahre · Pastrare 10 ani (EN 365)', W / 2, y + 13, { align: 'center' });
   setFont(6, 'normal', [120, 140, 160]);
   txt('ID: ' + ins.id + '  ·  ' + new Date().toLocaleString('ro-RO'), W - M, y + 13, { align: 'right' });
 
@@ -7001,7 +7182,7 @@ async function generateInspectionPDF(ins, returnBase64 = false) {
     doc.addPage();
     fillRect(0, 0, W, 14, NAVY);
     setFont(10, 'bold', WHITE);
-    txt('FOTOGRAFII DEFECTE / FOTOS / DEFECT PHOTOS  —  ' + ins.id, M, 9);
+    txt('DEFECT PHOTOS / Defekt-Fotos / Fotografii defecte  —  ' + ins.id, M, 9);
     let py = 18;
     let px = M;
     const phW = (cw - 6) / 2;
