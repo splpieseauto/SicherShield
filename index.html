@@ -1858,6 +1858,7 @@ textarea { resize: vertical; min-height: 80px; }
           <div class="scan-methods">
             <button class="btn btn-primary" onclick="startQRScan()">📷 Scanare QR</button>
             <button class="btn btn-sec" onclick="startNFCScan()">📡 Citire NFC</button>
+            <button class="btn btn-sec" onclick="showProgramNewTagPicker()">📡 Programează tag nou</button>
             <button class="btn btn-ghost" onclick="manualLookup()">⌨️ Cod manual</button>
           </div>
         </div>
@@ -4037,7 +4038,7 @@ function renderCatalog() {
             const icon = rs === 'active' ? '\uD83D\uDEA8' : rs === 'watch' ? '\u26A0\uFE0F' : rs === 'expired' ? '\u2714' : '';
             const tip  = rs === 'active' ? 'RECALL ACTIV — click pentru informatii producator' : rs === 'watch' ? 'Recall in monitorizare — click pentru informatii' : 'Recall inchis';
             return `
-            <div class="cat-product-row" onclick="prefillFromCatalog('${p.brand}','${p.model.replace(/'/g,"\\'")}','${p.type}','${p.norm}',${p.lifespan},'${p.notes.replace(/'/g,"\\'")}')">
+            <div class="cat-product-row" onclick="prefillFromCatalog('${p.brand}','${p.model.replace(/'/g,"\\'")}','${p.type}','${p.norm}',${p.lifespan},'${p.notes.replace(/'/g,"\\'")}',${p.workLifespan||'null'})">
               <div class="cat-product-name">${p.model}${p._custom ? '<span class="cat-custom-tag">custom</span>' : ''}</div>
               <div class="cat-product-type">${p.type}</div>
               <div class="cat-product-norm">${p.norm.split('+')[0].trim()}</div>
@@ -4050,12 +4051,12 @@ function renderCatalog() {
   </div>`;
 }
 
-function prefillFromCatalog(brand, model, type, norm, lifespan, notes) {
+function prefillFromCatalog(brand, model, type, norm, lifespan, notes, workLifespan) {
   showModal('add-equip');
   setTimeout(() => {
     const s = document.getElementById('product-search-input');
     if (s) { s.value = `${brand} ${model}`; }
-    setProductFields(brand, model, type, norm, lifespan, notes);
+    setProductFields(brand, model, type, norm, lifespan, notes, workLifespan);
     toast(`✔ ${brand} ${model} — selectat din catalog`, 'success');
   }, 80);
 }
@@ -4202,11 +4203,19 @@ function getAlerts() {
     } else if (days !== null && days <= 0) {
       alerts.push({ type:'overdue', eq, days, msg:`Inspecție DEPĂȘITĂ cu ${Math.abs(days)} zile!` });
     }
-    // Age check
+    // Age check — maximum lifespan
     const age = parseFloat(equipAge(eq));
     const lifespan = eq.lifespan || 10;
     if (age > lifespan * 0.9) {
-      alerts.push({ type:'age', eq, msg:`Durată de utilizare aproape depășită (${age}/${lifespan} ani)` });
+      alerts.push({ type:'age', eq, msg:`Durată de viață maximă aproape depășită (${age}/${lifespan} ani)` });
+    }
+    // Age check — working lifespan (from first use / purchase date)
+    if (eq.workLifespan && eq.purchaseDate) {
+      const wms = new Date() - new Date(eq.purchaseDate);
+      const wAge = parseFloat((wms / (365.25 * 86400000)).toFixed(1));
+      if (wAge > eq.workLifespan * 0.9) {
+        alerts.push({ type:'age', eq, msg:`Durată de viață în lucru aproape depășită (${wAge}/${eq.workLifespan} ani)` });
+      }
     }
     // Status warn/fail
     if (eq.status === 'fail') {
@@ -4425,6 +4434,15 @@ function showDetail(id) {
   const lifespan = eq.lifespan || 10;
   const lifePct = Math.min(100, Math.round(age / lifespan * 100));
   const lifeColor = lifePct > 90 ? 'var(--red)' : lifePct > 70 ? 'var(--yellow)' : 'var(--green)';
+  // Working lifespan — counted from first use (purchase) date
+  const workLifespan = eq.workLifespan || null;
+  let workAge = null, workPct = 0, workColor = 'var(--green)';
+  if (workLifespan && eq.purchaseDate) {
+    const ms = new Date() - new Date(eq.purchaseDate);
+    workAge = (ms / (365.25 * 86400000)).toFixed(1);
+    workPct = Math.min(100, Math.round(workAge / workLifespan * 100));
+    workColor = workPct > 90 ? 'var(--red)' : workPct > 70 ? 'var(--yellow)' : 'var(--green)';
+  }
   const inspHistory = db.inspections.filter(i=>i.equipId===id).sort((a,b)=>b.date.localeCompare(a.date));
 
   document.getElementById('detail-actions').innerHTML = `
@@ -4453,9 +4471,14 @@ function showDetail(id) {
         </div>
         ${eq.notes ? `<div style="margin-top:12px;padding:10px;background:var(--s3);border-radius:6px;font-size:13px;color:var(--text2)">📝 ${eq.notes}</div>` : ''}
         <div class="lifespan-bar" style="margin-top:16px">
-          <div class="meta-key">Durată de utilizare — ${age} din ${lifespan} ani (${lifePct}%)</div>
+          <div class="meta-key">Durată de viață maximă — ${age} din ${lifespan} ani (${lifePct}%)</div>
           <div class="progress-bar" style="margin-top:6px"><div class="progress-fill" style="width:${lifePct}%;background:${lifeColor}"></div></div>
         </div>
+        ${workLifespan ? `
+        <div class="lifespan-bar" style="margin-top:12px">
+          <div class="meta-key">Durată de viață în lucru — ${workAge!==null?workAge:'?'} din ${workLifespan} ani${workAge!==null?' ('+workPct+'%)':''}</div>
+          <div class="progress-bar" style="margin-top:6px"><div class="progress-fill" style="width:${workPct}%;background:${workColor}"></div></div>
+        </div>` : ''}
       </div>
       <div class="equip-hero-qr">
         <div class="meta-key" style="text-align:center">Cod QR echipament</div>
@@ -5018,6 +5041,29 @@ function saveInspection(generatePdf = false) {
   driveAutoUploadAfterInspection(ins);
   if (generatePdf) { setTimeout(() => generateInspectionPDF(ins, false), 300); }
   showDetail(equipId);
+  // After detail is shown, if equipment has no NFC tag programmed yet and Web NFC is supported,
+  // offer to program the tag right now with the verification URL.
+  if (eq && !eq.nfcTagWritten && ('NDEFReader' in window)) {
+    setTimeout(() => offerWriteNfcAfterInspection(equipId), 600);
+  }
+}
+
+function offerWriteNfcAfterInspection(equipId) {
+  const eq = db.equipment.find(e => e.id === equipId);
+  if (!eq) return;
+  showModal('post-inspection-nfc');
+  document.getElementById('modal-title').textContent = '📡 Programează tag NFC';
+  document.getElementById('modal-body').innerHTML = `
+    <div style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:14px">
+      <strong>${eq.name}</strong> nu are încă un tag NFC programat.
+      <br><br>
+      Vrei să programezi acum un tag nou? Tag-ul va conține link-ul de verificare cu ID-ul echipamentului — la viitoarea scanare se va deschide direct fișa cu cea mai recentă inspecție.
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="closeModal()">Sar peste</button>
+      <button class="btn btn-primary" onclick="closeModal();startNfcWrite('${equipId}')">📡 Scrie tag NFC acum</button>
+    </div>
+  `;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -5216,7 +5262,9 @@ async function startNFCScan() {
           return;
         }
       }
-      toast('Etichetă NFC nerecunoscută — rescrie tag-ul din fișa echipamentului.', 'error');
+      // Tag scanned, but contains nothing recognizable — offer to program it.
+      cancelScan();
+      offerProgramBlankTag();
     });
     ndef.addEventListener('readingerror', () => {
       toast('Eroare citire tag NFC.', 'error');
@@ -5235,9 +5283,9 @@ function manualLookup() {
 function handleScanResult(code) {
   const eq = db.equipment.find(e => e.id === code || e.serial === code);
   const resultEl = document.getElementById('scan-result');
-  resultEl.style.display = 'block';
 
   if (!eq) {
+    resultEl.style.display = 'block';
     resultEl.innerHTML = `
       <div style="padding:20px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r)">
         <div style="color:var(--red);font-family:var(--font-h);font-size:18px;margin-bottom:8px">❌ Echipament negăsit</div>
@@ -5251,28 +5299,15 @@ function handleScanResult(code) {
     return;
   }
 
+  // Equipment found — go directly to its fișă, which shows the latest inspection at the top.
+  // Show last-inspection summary in a non-intrusive toast so the user has feedback.
   const li = lastInspection(eq.id);
-  const next = nextInspectionDate(eq.id);
-  resultEl.innerHTML = `
-    <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:20px">
-      <div style="font-family:var(--font-m);font-size:11px;color:var(--green);margin-bottom:8px">✓ ECHIPAMENT IDENTIFICAT</div>
-      <div style="font-family:var(--font-h);font-size:22px;font-weight:700;margin-bottom:4px">${eq.name}</div>
-      <div style="font-family:var(--font-m);font-size:11px;color:var(--text3);margin-bottom:12px">${eq.serial} &nbsp;|&nbsp; ${eq.type}</div>
-      <div class="d-flex" style="margin-bottom:12px">${statusBadge(eq.status)}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:16px">
-        <div><span style="color:var(--text3)">Ultima inspecție: </span>${li ? formatDate(li.date) : '<span style="color:var(--yellow)">Niciodată</span>'}</div>
-        <div><span style="color:var(--text3)">Următoarea: </span>${next ? formatDate(next) : '—'}</div>
-        <div><span style="color:var(--text3)">Proprietar: </span>${eq.owner||'—'}</div>
-        <div><span style="color:var(--text3)">Locație: </span>${eq.location||'—'}</div>
-      </div>
-      <div class="d-flex">
-        <button class="btn btn-primary" onclick="showDetail('${eq.id}')">📋 Fișă completă</button>
-        <button class="btn btn-sec" onclick="renderInspectForm('${eq.id}');showPage('inspect-new')">＋ Inspecție</button>
-        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('scan-result').style.display='none';document.getElementById('scan-idle').style.display='block'">Scanare nouă</button>
-      </div>
-    </div>`;
-
-  toast('Echipament identificat: ' + eq.name, 'success');
+  resultEl.style.display = 'none';
+  const insSummary = li
+    ? `ultima inspecție: ${formatDate(li.date)} (${li.verdict==='ok'?'OK':li.verdict==='warn'?'Atenție':li.verdict==='fail'?'Respins':'?'})`
+    : 'neinspectat încă';
+  toast(`✓ ${eq.name} — ${insSummary}`, 'success');
+  showDetail(eq.id);
 }
 
 function checkCameraSupport() {
@@ -5395,6 +5430,94 @@ async function startNfcWrite(equipId) {
 function cancelNfcWrite() {
   if (_nfcWriteController) { _nfcWriteController.abort(); _nfcWriteController = null; }
   document.getElementById('nfc-write-overlay').classList.remove('open');
+}
+
+// ─────────────────────────────────────────────────────────────
+// Pick equipment, then write its verification URL to a fresh tag
+// Triggered from the Scan page "Programează tag nou" button,
+// and as recovery when a blank/unknown tag is detected.
+// ─────────────────────────────────────────────────────────────
+function showProgramNewTagPicker(prefilter) {
+  if (!('NDEFReader' in window)) {
+    toast('Web NFC nu este suportat. Necesită Android + Chrome.', 'error');
+    showNfcBrowserWarning();
+    return;
+  }
+  const list = db.equipment.filter(e => e.status !== 'ret');
+  if (!list.length) {
+    toast('Nu există niciun echipament activ pentru a-i asocia un tag NFC.', 'error');
+    return;
+  }
+  showModal('program-new-tag');
+  document.getElementById('modal-title').textContent = '📡 Programează tag NFC nou';
+  document.getElementById('modal-body').innerHTML = `
+    <div style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.6">
+      Alege echipamentul căruia vrei să-i asociezi acest tag NFC. La click pe „Scrie tag", se va scrie un URL de verificare care, la viitoarea scanare, va deschide direct fișa echipamentului.
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Caută echipament</label>
+      <input type="text" id="prog-tag-search" placeholder="Nume, S/N sau ID…" oninput="filterProgramTagList(this.value)">
+    </div>
+    <div id="prog-tag-list" style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
+      ${renderProgramTagList(list)}
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeModal()">Anulare</button>
+    </div>
+  `;
+  if (prefilter) {
+    const inp = document.getElementById('prog-tag-search');
+    if (inp) { inp.value = prefilter; filterProgramTagList(prefilter); }
+  }
+}
+
+function renderProgramTagList(list) {
+  if (!list.length) {
+    return '<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">Niciun echipament găsit.</div>';
+  }
+  return list.map(eq => `
+    <div class="pd-item" style="cursor:pointer;padding:10px 12px;border-bottom:1px solid var(--border)"
+         onclick="closeModal();startNfcWrite('${eq.id}')">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            ${eq.name}${eq.nfcTagWritten ? ' <span style="color:var(--blue);font-size:11px;font-family:var(--font-m)">📡 ' + eq.nfcTagWritten + '</span>' : ''}
+          </div>
+          <div style="font-family:var(--font-m);font-size:11px;color:var(--text3)">
+            ${eq.id} &nbsp;|&nbsp; S/N: ${eq.serial} &nbsp;|&nbsp; ${eq.type}
+          </div>
+        </div>
+        <span class="btn btn-sec btn-xs" style="white-space:nowrap">📡 Scrie tag →</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filterProgramTagList(val) {
+  const q = (val || '').toLowerCase().trim();
+  const list = db.equipment.filter(e => e.status !== 'ret').filter(e =>
+    !q || `${e.name} ${e.serial} ${e.id} ${e.type} ${e.manufacturer||''} ${e.model||''}`.toLowerCase().includes(q)
+  );
+  const el = document.getElementById('prog-tag-list');
+  if (el) el.innerHTML = renderProgramTagList(list);
+}
+
+// Called from the scan flow when a tag is read but contains nothing
+// the app understands (blank tag or tag with unrelated content).
+function offerProgramBlankTag() {
+  showModal('blank-tag-offer');
+  document.getElementById('modal-title').textContent = '📡 Tag NFC gol sau nerecunoscut';
+  document.getElementById('modal-body').innerHTML = `
+    <div style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:14px">
+      Tag-ul scanat nu conține un cod de echipament SicherShield. Poate fi un tag nou (gol) sau un tag programat pentru altceva.
+      <br><br>
+      Vrei să-l programezi acum pentru un echipament din lista ta?
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn btn-ghost" onclick="closeModal()">Nu, închide</button>
+      <button class="btn btn-primary" onclick="closeModal();showProgramNewTagPicker()">📡 Programează acum</button>
+    </div>
+  `;
 }
 
 function nfcErrorMessage(e) {
@@ -5553,12 +5676,25 @@ function equipFormHTML(eq, prefillSerial) {
         <input type="date" id="f-manufacture" value="${v('manufactureDate')}">
       </div>
       <div class="form-group">
-        <label class="form-label">Durată de viață (ani)</label>
+        <label class="form-label">Durată de viață maximă (ani)</label>
         <input type="number" id="f-lifespan" placeholder="10" min="1" max="20" value="${v('lifespan','10')}">
       </div>
       <div class="form-group">
-        <label class="form-label">Locație / Depozit</label>
-        <input type="text" id="f-location" placeholder="Ex: Depozit A, Sala Colt" value="${v('location')}">
+        <label class="form-label">Durată de viață în lucru (ani)</label>
+        <input type="number" id="f-work-lifespan" placeholder="5" min="1" max="20" value="${v('workLifespan','')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Locație</label>
+        <select id="f-location">
+          ${(() => {
+            const raw = (v('location') || '').toString();
+            const norm = /depozit|retras|storage|warehouse/i.test(raw) ? 'Depozit' : (raw ? 'În utilizare' : 'În utilizare');
+            return `
+              <option value="În utilizare" ${norm==='În utilizare'?'selected':''}>🔧 În utilizare</option>
+              <option value="Depozit" ${norm==='Depozit'?'selected':''}>📦 Depozit</option>
+            `;
+          })()}
+        </select>
       </div>
       <div class="form-group">
         <label class="form-label">Proprietar / Utilizator</label>
@@ -5598,7 +5734,7 @@ function filterProductDropdown(val) {
     dd.innerHTML = `<div class="pd-no-results">Niciun produs găsit în catalog</div>`;
   } else {
     dd.innerHTML = hits.map(p => `
-      <div class="pd-item" onclick="selectProduct('${p.brand}','${p.model.replace(/'/g,"\\'")}','${p.type}','${p.norm}',${p.lifespan},'${p.notes.replace(/'/g,"\\'")}')">
+      <div class="pd-item" onclick="selectProduct('${p.brand}','${p.model.replace(/'/g,"\\'")}','${p.type}','${p.norm}',${p.lifespan},'${p.notes.replace(/'/g,"\\'")}',${p.workLifespan||'null'})">
         <span class="pd-item-brand" style="color:${BRAND_META[p.brand]?.color||'var(--accent)'}">${p.brand}</span>
         <span class="pd-item-name">${p.model}</span>
         <span class="pd-item-type">${p.type}</span>
@@ -5608,19 +5744,22 @@ function filterProductDropdown(val) {
   dd.classList.add('open');
 }
 
-function selectProduct(brand, model, type, norm, lifespan, notes) {
+function selectProduct(brand, model, type, norm, lifespan, notes, workLifespan) {
   document.getElementById('product-dropdown')?.classList.remove('open');
   const inp = document.getElementById('product-search-input');
   if (inp) inp.value = `${brand} — ${model}`;
-  setProductFields(brand, model, type, norm, lifespan, notes);
+  setProductFields(brand, model, type, norm, lifespan, notes, workLifespan);
 }
 
-function setProductFields(brand, model, type, norm, lifespan, notes) {
+function setProductFields(brand, model, type, norm, lifespan, notes, workLifespan) {
   const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
   setVal('f-manufacturer', brand);
   setVal('f-model', model);
   setVal('f-norm', norm);
   setVal('f-lifespan', lifespan);
+  if (workLifespan != null && workLifespan !== '' && workLifespan !== undefined) {
+    setVal('f-work-lifespan', workLifespan);
+  }
   setVal('f-type', type);
   // Only set name/notes if still empty
   const nameEl = document.getElementById('f-name');
@@ -5674,6 +5813,7 @@ function getFormData() {
     purchaseDate: document.getElementById('f-purchase')?.value,
     manufactureDate: document.getElementById('f-manufacture')?.value,
     lifespan: parseInt(document.getElementById('f-lifespan')?.value) || 10,
+    workLifespan: parseInt(document.getElementById('f-work-lifespan')?.value) || null,
     location: document.getElementById('f-location')?.value.trim(),
     owner: document.getElementById('f-owner')?.value.trim(),
     status: document.getElementById('f-status')?.value || 'ok',
@@ -5702,8 +5842,8 @@ function exportJSON() {
 }
 
 function exportCSV() {
-  const headers = ['ID','Nume','Tip','Serial','Producator','Model','Norma','Data cumparare','Data fabricatie','Durata viata','Localitate','Proprietar','Status','Note'];
-  const rows = db.equipment.map(e => [e.id,e.name,e.type,e.serial,e.manufacturer,e.model,e.norm,e.purchaseDate,e.manufactureDate,e.lifespan,e.location,e.owner,e.status,e.notes].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`));
+  const headers = ['ID','Nume','Tip','Serial','Producator','Model','Norma','Data cumparare','Data fabricatie','Durata viata maxima','Durata viata in lucru','Localitate','Proprietar','Status','Note'];
+  const rows = db.equipment.map(e => [e.id,e.name,e.type,e.serial,e.manufacturer,e.model,e.norm,e.purchaseDate,e.manufactureDate,e.lifespan,e.workLifespan||'',e.location,e.owner,e.status,e.notes].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`));
   const csv = [headers, ...rows].map(r=>r.join(',')).join('\n');
   const blob = new Blob(['\uFEFF' + csv], { type:'text/csv;charset=utf-8' });
   const a = document.createElement('a');
@@ -5868,12 +6008,19 @@ function catalogProductFormHTML(existingJson) {
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group">
-        <label class="form-label">Durată viață (ani)</label>
+        <label class="form-label">Durată de viață maximă (ani)</label>
         <input type="number" id="cp-lifespan" min="1" max="30" value="${v('lifespan','10')}">
       </div>
       <div class="form-group">
         <label class="form-label">Culoare brand (hex)</label>
         <input type="text" id="cp-color" placeholder="#e8500a" value="${v('color','#888888')}">
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label class="form-label">Durată de viață în lucru (ani)</label>
+        <input type="number" id="cp-work-lifespan" min="1" max="30" placeholder="5" value="${v('workLifespan','')}">
       </div>
     </div>
 
@@ -5954,6 +6101,7 @@ function saveCatalogProduct(existingId) {
     type,
     norm:     document.getElementById('cp-norm')?.value.trim() || '',
     lifespan: parseInt(document.getElementById('cp-lifespan')?.value) || 10,
+    workLifespan: parseInt(document.getElementById('cp-work-lifespan')?.value) || null,
     color:    document.getElementById('cp-color')?.value.trim() || '#888888',
     notes:    document.getElementById('cp-notes')?.value.trim() || '',
     recall,
@@ -6017,7 +6165,8 @@ function showCatalogProductDetail(pJson) {
         <div><span style="color:var(--text3)">Producător: </span>${p.brand}</div>
         <div><span style="color:var(--text3)">Model: </span>${p.model}</div>
         <div><span style="color:var(--text3)">Normă: </span>${p.norm||'—'}</div>
-        <div><span style="color:var(--text3)">Durată viață: </span>${p.lifespan||10} ani</div>
+        <div><span style="color:var(--text3)">Durată viață maximă: </span>${p.lifespan||10} ani</div>
+        <div><span style="color:var(--text3)">Durată viață în lucru: </span>${p.workLifespan ? p.workLifespan + ' ani' : '—'}</div>
       </div>
     </div>
 
@@ -6034,7 +6183,7 @@ function showCatalogProductDetail(pJson) {
 
     <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:18px">
       <div style="display:flex;gap:8px">
-        <button class="btn btn-primary btn-sm" onclick="closeModal();prefillFromCatalog('${p.brand.replace(/'/g,"\'")}','${p.model.replace(/'/g,"\'")}','${p.type}','${p.norm||''}',${p.lifespan||10},'${(p.notes||'').replace(/'/g,"\'")}')">
+        <button class="btn btn-primary btn-sm" onclick="closeModal();prefillFromCatalog('${p.brand.replace(/'/g,"\'")}','${p.model.replace(/'/g,"\'")}','${p.type}','${p.norm||''}',${p.lifespan||10},'${(p.notes||'').replace(/'/g,"\'")}',${p.workLifespan||'null'})">
           ＋ Adaugă echipament
         </button>
         ${isCustom ? `
@@ -6382,8 +6531,8 @@ async function driveUploadCSV(type) {
     csv = '\uFEFF' + [headers,...rows].map(r=>r.join(',')).join('\n');
     filename = `sicher_inspectii_${d}.csv`;
   } else {
-    const headers = ['ID','Nume','Tip','Serial','Producator','Model','Lot','Norma','Data cumparare','Data fabricatie','Durata viata','Localitate','Proprietar','Status','Note'];
-    const rows = db.equipment.map(e => [e.id,e.name,e.type,e.serial,e.manufacturer,e.model,e.lot||'',e.norm,e.purchaseDate,e.manufactureDate,e.lifespan,e.location,e.owner,e.status,e.notes].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`));
+    const headers = ['ID','Nume','Tip','Serial','Producator','Model','Lot','Norma','Data cumparare','Data fabricatie','Durata viata maxima','Durata viata in lucru','Localitate','Proprietar','Status','Note'];
+    const rows = db.equipment.map(e => [e.id,e.name,e.type,e.serial,e.manufacturer,e.model,e.lot||'',e.norm,e.purchaseDate,e.manufactureDate,e.lifespan,e.workLifespan||'',e.location,e.owner,e.status,e.notes].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`));
     csv = '\uFEFF' + [headers,...rows].map(r=>r.join(',')).join('\n');
     filename = `sicher_echipamente_${d}.csv`;
   }
@@ -6559,8 +6708,9 @@ async function generateInspectionPDF(ins, returnBase64 = false) {
 
   // Row 3: Durata viata | Norma | Lot | Utilizator | Locatie
   const col5w = cw / 5;
+  const lifespanVal = (eq.lifespan || '10') + (eq.workLifespan ? ' / ' + eq.workLifespan : '') + ' ani';
   const cells3 = [
-    { ro: 'DURATA VIATA', de: 'Max. Nutzungsdauer', en: 'Max. lifespan', val: (eq.lifespan || '10') + ' ani/years' },
+    { ro: 'DURATA VIATA MAX/LUCRU', de: 'Max./Einsatz Nutzungsdauer', en: 'Max./working lifespan', val: lifespanVal },
     { ro: 'NORMA EN', de: 'Angewandte Norm', en: 'Applicable standard', val: eq.norm || '' },
     { ro: 'LOT / BATCH', de: 'Charge', en: 'Batch no.', val: eq.lot || '' },
     { ro: 'UTILIZATOR', de: 'Zugeordneter Nutzer', en: 'Assigned user', val: eq.owner || '' },
