@@ -3845,7 +3845,12 @@ function _scheduleGasSync() {
 
 async function gasSyncAll() {
   try {
-    const result = await gasCall({ action: 'syncAll', data: JSON.stringify(db) });
+    // Trimite db fara photos (photos nu se salveaza in Sheets, sunt prea mari)
+    const dbForSync = {
+      equipment:   db.equipment,
+      inspections: db.inspections.map(i => Object.assign({}, i, { photos: [] }))
+    };
+    const result = await gasCallPost({ action: 'syncAll', data: JSON.stringify(dbForSync) });
     if (result && result.ok) {
       const el = document.getElementById('gas-last-sync');
       if (el) el.textContent = new Date().toLocaleString('ro-RO', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
@@ -4422,8 +4427,8 @@ function retireEquip(id) {
     saveDB();
     showDetail(id);
     toast('Echipament retras din uz.', 'info');
-    // Salvare imediata in Sheets
-    gasCall({ action: 'saveEquipment', equipment: JSON.stringify(eq) })
+    // Salvare imediata in Sheets — POST
+    gasCallPost({ action: 'saveEquipment', equipment: JSON.stringify(eq) })
       .catch(e => console.warn('[GAS] saveEquipment retire:', e.message));
   }
 }
@@ -5938,16 +5943,16 @@ function saveEquip(existingId) {
     Object.assign(eq, getFormData());
     saveDB(); closeModal(); showDetail(existingId);
     toast('Echipament actualizat.', 'success');
-    // Salvare imediata in Sheets prin GAS
-    gasCall({ action: 'saveEquipment', equipment: JSON.stringify(eq) })
+    // Salvare imediata in Sheets prin GAS — POST
+    gasCallPost({ action: 'saveEquipment', equipment: JSON.stringify(eq) })
       .catch(e => console.warn('[GAS] saveEquipment update:', e.message));
   } else {
     const eq = { id: genId(), ...getFormData(), status: document.getElementById('f-status')?.value || 'ok' };
     db.equipment.push(eq);
     saveDB(); closeModal();
     toast('Echipament adăugat: ' + eq.name, 'success');
-    // Salvare imediata in Sheets prin GAS
-    gasCall({ action: 'saveEquipment', equipment: JSON.stringify(eq) })
+    // Salvare imediata in Sheets prin GAS — POST
+    gasCallPost({ action: 'saveEquipment', equipment: JSON.stringify(eq) })
       .catch(e => console.warn('[GAS] saveEquipment add:', e.message));
     if (window._returnToInspectAfterEquipAdd) {
       window._returnToInspectAfterEquipAdd = false;
@@ -6286,6 +6291,10 @@ function saveCatalogProduct(existingId) {
   saveDB();
   closeModal();
   renderCatalog();
+  // Actualizeaza catalogul in Drive dupa orice modificare customCatalog
+  if (_gasConfigured()) {
+    setTimeout(() => _uploadCatalogToDrive().catch(() => {}), 1500);
+  }
 }
 
 function deleteCatalogProduct(id) {
@@ -6295,6 +6304,10 @@ function deleteCatalogProduct(id) {
   closeModal();
   renderCatalog();
   toast('Produs șters din catalog.', 'info');
+  // Actualizeaza catalogul in Drive
+  if (_gasConfigured()) {
+    setTimeout(() => _uploadCatalogToDrive().catch(() => {}), 1500);
+  }
 }
 
 function showCatalogProductDetail(pJson) {
@@ -6500,18 +6513,65 @@ async function driveUploadCSV(type) {
 }
 
 async function driveUploadJSON() {
-  if (!_gasConfigured()) return;
+  if (!_gasConfigured()) return null;
   try {
+    // 1. Backup DB (echipamente + inspectii + customCatalog)
     const jsonStr = JSON.stringify(db, null, 2);
     const result = await gasCallPost({ action: 'saveJson', jsonData: jsonStr });
     if (result && result.ok) {
       addDriveLog(result.filename || 'backup.json', 'ok');
-      return result;
     }
+
+    // 2. Export catalog complet (PRODUCT_DB hardcodat + customCatalog user)
+    //    Se face in paralel, eroarea nu blocheaza backup-ul DB
+    _uploadCatalogToDrive().catch(e => console.warn('[GAS] catalog upload:', e.message));
+
+    return result || null;
   } catch(e) {
     console.warn('[GAS] driveUploadJSON:', e.message);
+    return null;
   }
-  return null;
+}
+
+// Exporta catalogul complet (toate produsele + recall-uri + URL-uri) in Drive
+// Fisier: /Catalog/catalog_echipamente_PPE.json  (suprascris la fiecare update)
+async function _uploadCatalogToDrive() {
+  if (!_gasConfigured()) return;
+  if (typeof PRODUCT_DB === 'undefined') return;
+
+  const allProducts = [...PRODUCT_DB, ...(db.customCatalog || [])];
+  const catalog = {
+    generated:    new Date().toISOString(),
+    totalProducts: allProducts.length,
+    brands:       [...new Set(allProducts.map(p => p.brand))].sort(),
+    activeRecalls: allProducts.filter(p => p.recall && p.recall.status === 'active').length,
+    watchNotices:  allProducts.filter(p => p.recall && p.recall.status === 'watch').length,
+    products:     allProducts.map(p => ({
+      brand:    p.brand,
+      type:     p.type,
+      model:    p.model,
+      norm:     p.norm     || '',
+      lifespan: p.lifespan || 10,
+      notes:    p.notes    || '',
+      recall:   p.recall   ? {
+        status:      p.recall.status,
+        ref:         p.recall.ref         || '',
+        description: p.recall.description || '',
+        date:        p.recall.date         || '',
+        url:         p.recall.url          || ''
+      } : null
+    }))
+  };
+
+  const jsonStr = JSON.stringify(catalog, null, 2);
+  const today   = new Date().toISOString().slice(0, 10);
+
+  await gasCallPost({
+    action:     'saveJson',
+    jsonData:   jsonStr,
+    filename:   'catalog_echipamente_PPE_' + today + '.json',
+    folderName: 'Catalog'
+  });
 }
 
 async function generateInspectionPDF(ins, returnBase64 = false) {
@@ -7024,10 +7084,11 @@ async function driveAutoUploadAfterInspection(ins) {
   const cfg = loadDriveConfig();
   const eq  = db.equipment.find(e => e.id === ins.equipId);
 
-  // 1. Salvează inspecția individual în Sheets prin GAS (imediat)
-  gasCall({
+  // 1. Salvează inspecția individual în Sheets prin GAS — POST (poate contine poze base64)
+  const insForSheets = Object.assign({}, ins, { photos: [] }); // photos nu merg in Sheets
+  gasCallPost({
     action: 'saveInspection',
-    inspection: JSON.stringify(ins),
+    inspection: JSON.stringify(insForSheets),
     equipName: eq ? eq.name : ''
   }).catch(e => console.warn('[GAS] saveInspection:', e.message));
 
@@ -7086,6 +7147,14 @@ function saveGasUrl() {
   localStorage.setItem('ss_gas_url', url);
   window._gasUrlOverride = url;
   _updateGasStatusUI();
+  // La prima configurare, trimite imediat catalogul in Drive
+  if (url && !url.includes('INLOCUIESTE')) {
+    setTimeout(() => {
+      _uploadCatalogToDrive()
+        .then(() => { addDriveLog('catalog_echipamente_PPE.json', 'ok'); toast('📚 Catalog PPE salvat în Drive.', 'success'); })
+        .catch(() => {});
+    }, 1000);
+  }
 }
 
 function applyGasConfigToUI() {
