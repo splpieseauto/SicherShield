@@ -25,6 +25,34 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
+  // ── PROTECȚIE ACCES — rulează ÎNAINTE de orice altceva ──────────────
+  // Dacă URL-ul conține ?action=view (scan NFC/QR de la strain) → redirect imediat la GAS
+  // Nu se încarcă aplicația, nu se afișează nimic din ea
+  (function() {
+    try {
+      var p = new URLSearchParams(window.location.search);
+      var gasUrl = 'https://script.google.com/macros/s/AKfycbzJ22eW5X-h0WjcHT5ZY0sDn8BRFmm-y545uLzEpLsfGVbcScOPYFP2fZVEjpRqu1Zj/exec';
+      // Redirect pentru taguri NOI (action=view + token)
+      if (p.get('action') === 'view' && p.get('eq')) {
+        window.location.replace(gasUrl + '?action=view&eq=' + encodeURIComponent(p.get('eq')) + '&token=' + encodeURIComponent(p.get('token') || ''));
+        document.write(''); // opreste incarcarea paginii
+        return;
+      }
+      // Redirect pentru taguri VECHI (doar ?eq= fara token, fara action)
+      // Daca nu exista PIN setat local, tratam ca scan extern
+      if (p.get('eq') && !p.get('action')) {
+        var hasPinSet = !!localStorage.getItem('ss_pin_hash');
+        var isAuthenticated = sessionStorage.getItem('ss_auth') === '1';
+        if (!isAuthenticated && !hasPinSet) {
+          // Nu e autentificat si nu are PIN setat → redirect la GAS viewer
+          window.location.replace(gasUrl + '?action=view&eq=' + encodeURIComponent(p.get('eq')) + '&token=legacy');
+          document.write('');
+          return;
+        }
+      }
+    } catch(e) {}
+  })();
+
   // ── Google Apps Script URL — ZERO OAuth, zero popup ──────────────────
   // Înlocuiește cu URL-ul generat după deployment în script.google.com
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbzJ22eW5X-h0WjcHT5ZY0sDn8BRFmm-y545uLzEpLsfGVbcScOPYFP2fZVEjpRqu1Zj/exec';
@@ -1649,6 +1677,63 @@ textarea { resize: vertical; min-height: 80px; }
 </head>
 <body>
 
+<!-- ══════════════ PIN LOCK OVERLAY ══════════════ -->
+<div id="pin-overlay" style="display:none;position:fixed;inset:0;z-index:99999;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column">
+  <div style="background:var(--s2);border:1px solid var(--border);border-radius:16px;padding:32px 28px;max-width:320px;width:90%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+    <div style="font-size:40px;margin-bottom:8px">🔒</div>
+    <div style="font-family:var(--font-h);font-size:22px;font-weight:700;color:var(--text);margin-bottom:4px">SicherShield</div>
+    <div id="pin-subtitle" style="font-size:13px;color:var(--text3);margin-bottom:24px">Introdu PIN-ul de acces</div>
+    <div id="pin-dots" style="display:flex;gap:12px;justify-content:center;margin-bottom:20px">
+      <div class="pin-dot" id="d0"></div>
+      <div class="pin-dot" id="d1"></div>
+      <div class="pin-dot" id="d2"></div>
+      <div class="pin-dot" id="d3"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+      <button class="pin-btn" onclick="pinDigit(1)">1</button>
+      <button class="pin-btn" onclick="pinDigit(2)">2</button>
+      <button class="pin-btn" onclick="pinDigit(3)">3</button>
+      <button class="pin-btn" onclick="pinDigit(4)">4</button>
+      <button class="pin-btn" onclick="pinDigit(5)">5</button>
+      <button class="pin-btn" onclick="pinDigit(6)">6</button>
+      <button class="pin-btn" onclick="pinDigit(7)">7</button>
+      <button class="pin-btn" onclick="pinDigit(8)">8</button>
+      <button class="pin-btn" onclick="pinDigit(9)">9</button>
+      <button class="pin-btn" onclick="pinDigit('C')" style="background:var(--s3);font-size:18px">⌫</button>
+      <button class="pin-btn" onclick="pinDigit(0)">0</button>
+      <button class="pin-btn" onclick="pinDigit('C')" style="background:var(--s3);font-size:13px">✕</button>
+    </div>
+    <div id="pin-error" style="font-size:12px;color:var(--red);min-height:18px;margin-bottom:8px"></div>
+    <div id="pin-setup-hint" style="font-size:11px;color:var(--text3);display:none">Prima utilizare: introdu un PIN de 4 cifre pentru a proteja aplicația</div>
+  </div>
+</div>
+
+<style>
+.pin-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--text3);
+  background: transparent;
+  transition: background .15s, border-color .15s;
+}
+.pin-dot.filled { background: var(--accent); border-color: var(--accent); }
+.pin-dot.error  { background: var(--red);    border-color: var(--red);    }
+.pin-btn {
+  background: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 22px;
+  font-family: var(--font-h);
+  font-weight: 600;
+  padding: 14px 0;
+  cursor: pointer;
+  transition: background .1s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.pin-btn:active { background: var(--accent); color: #fff; transform: scale(.94); }
+</style>
+
 <!-- PWA INSTALL PROMPT -->
 <div id="pwa-install-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);align-items:center;justify-content:center;padding:20px">
   <div style="background:linear-gradient(135deg,#1e3a6e,#1a3468);border:1px solid rgba(240,90,26,.5);border-radius:16px;padding:32px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6)">
@@ -2068,6 +2153,15 @@ textarea { resize: vertical; min-height: 80px; }
             <button class="btn btn-primary" style="flex:1" onclick="gasTestConnection()">🔌 Testează conexiunea</button>
             <button class="btn btn-sec" style="flex:1" onclick="gasSyncAll().then(()=>toast('✅ Sync manual OK!','success'))">🔄 Sync manual</button>
           </div>
+        </div>
+
+        <!-- SECURITATE PIN -->
+        <div class="card">
+          <div class="card-title">🔒 Securitate acces</div>
+          <div style="font-size:13px;color:var(--text2);margin-bottom:12px">
+            Aplicația este protejată cu PIN de 4 cifre. Persoanele care scanează un tag NFC sau QR code sunt redirecționate automat la pagina de vizualizare inspecție — fără acces la aplicație.
+          </div>
+          <button class="btn btn-sec" onclick="changePinFromSettings()">🔑 Schimbă PIN-ul</button>
         </div>
 
         <!-- JURNAL -->
@@ -5415,22 +5509,27 @@ async function startNfcWrite(equipId) {
     return;
   }
 
-  // Obtine token de la GAS (hash MD5 pe baza eqId + secret server-side)
-  let token = '';
+  // Anuleaza orice scan NFC activ — nu pot rula scan si write simultan
+  if (nfcController) { nfcController.abort(); nfcController = null; }
+  cancelScan();
+
+  // Obtine sau creeaza un cod scurt pentru acest echipament
+  // Short URL: GAS_URL?v=ABCDEF (121 bytes — incape pe ORICE tag NTAG213/215/216)
+  let shortCode = '';
   try {
-    const r = await gasCall({ action: 'getToken', eqId: eq.id });
-    if (r && r.ok) token = r.token;
+    const r = await gasCall({ action: 'createShortUrl', eqId: eq.id });
+    if (r && r.ok) shortCode = r.code;
   } catch(e) {
-    console.warn('[GAS] getToken failed:', e.message);
+    console.warn('[GAS] createShortUrl failed:', e.message);
   }
 
-  if (!token) {
-    toast('Nu s-a putut genera token NFC. Verifică conexiunea GAS.', 'error');
+  if (!shortCode) {
+    toast('Nu s-a putut genera codul NFC. Verifică conexiunea GAS.', 'error');
     return;
   }
 
-  // URL-ul merge la GAS viewer — straini vad ultima inspectie, nu aplicatia
-  const tagUrl = gasBase + '?action=view&eq=' + encodeURIComponent(eq.id) + '&token=' + token;
+  // URL scurt — 121 bytes, compatibil cu NTAG213 (cel mai comun tag)
+  const tagUrl = gasBase + '?v=' + shortCode;
 
   // Show overlay
   const overlay = document.getElementById('nfc-write-overlay');
@@ -5462,10 +5561,25 @@ async function startNfcWrite(equipId) {
 
     document.getElementById('nfc-write-progress').textContent = '⏳ Apropie tag-ul...';
 
-    await ndef.write(
-      { records: [{ recordType: 'url', data: tagUrl }] },
-      { signal: _nfcWriteController.signal, overwrite: true }
-    );
+    // Incearca cu overwrite:true, apoi fallback fara overwrite (taguri cu date existente)
+    try {
+      await ndef.write(
+        { records: [{ recordType: 'url', data: tagUrl }] },
+        { signal: _nfcWriteController.signal, overwrite: true }
+      );
+    } catch(writeErr) {
+      // I/O error cu overwrite:true — unele taguri necesita overwrite:false
+      if (writeErr.message && writeErr.message.includes('I/O') && !_nfcWriteController.signal.aborted) {
+        document.getElementById('nfc-write-progress').textContent = '⏳ Retry — apropie din nou tag-ul...';
+        await new Promise(res => setTimeout(res, 800));
+        await ndef.write(
+          { records: [{ recordType: 'url', data: tagUrl }] },
+          { signal: _nfcWriteController.signal, overwrite: false }
+        );
+      } else {
+        throw writeErr;
+      }
+    }
 
     // SUCCESS
     document.getElementById('nfc-write-icon').textContent = '✅';
@@ -5592,7 +5706,8 @@ function nfcErrorMessage(e) {
   if (e.message?.includes('not enabled') || e.message?.includes('disabled')) return 'NFC este dezactivat — activează din Setări Android.';
   if (e.message?.includes('AbortError')) return 'Operație anulată.';
   if (e.message?.includes('NetworkError')) return 'Eroare comunicare tag — încearcă din nou.';
-  if (e.message?.includes('NotSupportedError')) return 'Tag NFC incompatibil (folosește NTAG215/216).';
+  if (e.message?.includes('NotSupportedError')) return 'Tag NFC incompatibil (folosește NTAG213/215/216).';
+  if (e.message?.includes('I/O') || e.message?.toLowerCase().includes('i/o')) return 'Eroare I/O — tag posibil blocat la scriere sau read-only. Încearcă un alt tag NTAG213/215.';
   return e.message || 'Eroare necunoscută NFC.';
 }
 
@@ -7340,13 +7455,125 @@ setTimeout(() => {
   }
 }, 1500);
 
+// ═══════════════════════════════════════════════════════
+// PIN LOCK — protecție acces aplicație
+// ═══════════════════════════════════════════════════════
 
-loadDB();
-renderDashboard();
-updateSidebarCounts();
-applyMobileUI();
-initDriveOnPageLoad();
-checkUrlEquipParam();
+let _pinBuffer = '';
+let _pinMode = 'check'; // 'check' | 'setup'
+
+function _hashPin(pin) {
+  // Hash simplu client-side (nu e criptografie, e doar ofuscare)
+  let h = 0;
+  for (let i = 0; i < pin.length; i++) {
+    h = Math.imul(31, h) + pin.charCodeAt(i) | 0;
+  }
+  return 'pin_' + Math.abs(h).toString(36) + '_' + pin.length;
+}
+
+function pinDigit(d) {
+  if (d === 'C') {
+    _pinBuffer = _pinBuffer.slice(0, -1);
+    _updatePinDots();
+    document.getElementById('pin-error').textContent = '';
+    return;
+  }
+  if (_pinBuffer.length >= 4) return;
+  _pinBuffer += String(d);
+  _updatePinDots();
+  if (_pinBuffer.length === 4) {
+    setTimeout(_submitPin, 150);
+  }
+}
+
+function _updatePinDots(state) {
+  for (let i = 0; i < 4; i++) {
+    const dot = document.getElementById('d' + i);
+    if (!dot) continue;
+    dot.className = 'pin-dot';
+    if (state === 'error') dot.classList.add('error');
+    else if (i < _pinBuffer.length) dot.classList.add('filled');
+  }
+}
+
+function _submitPin() {
+  const stored = localStorage.getItem('ss_pin_hash');
+
+  if (_pinMode === 'setup' || !stored) {
+    // Prima utilizare — seteaza PIN
+    localStorage.setItem('ss_pin_hash', _hashPin(_pinBuffer));
+    sessionStorage.setItem('ss_auth', '1');
+    _pinBuffer = '';
+    _hidePinOverlay();
+    _startApp();
+    return;
+  }
+
+  // Verifica PIN
+  if (_hashPin(_pinBuffer) === stored) {
+    sessionStorage.setItem('ss_auth', '1');
+    _pinBuffer = '';
+    _hidePinOverlay();
+    _startApp();
+  } else {
+    _pinBuffer = '';
+    _updatePinDots('error');
+    document.getElementById('pin-error').textContent = 'PIN incorect. Încearcă din nou.';
+    setTimeout(() => { _updatePinDots(); document.getElementById('pin-error').textContent = ''; }, 1200);
+  }
+}
+
+function _showPinOverlay() {
+  const overlay = document.getElementById('pin-overlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  const stored = localStorage.getItem('ss_pin_hash');
+  if (!stored) {
+    _pinMode = 'setup';
+    document.getElementById('pin-subtitle').textContent = 'Setează un PIN de 4 cifre';
+    document.getElementById('pin-setup-hint').style.display = 'block';
+  } else {
+    _pinMode = 'check';
+    document.getElementById('pin-subtitle').textContent = 'Introdu PIN-ul de acces';
+    document.getElementById('pin-setup-hint').style.display = 'none';
+  }
+  _pinBuffer = '';
+  _updatePinDots();
+}
+
+function _hidePinOverlay() {
+  const overlay = document.getElementById('pin-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function _startApp() {
+  loadDB();
+  renderDashboard();
+  updateSidebarCounts();
+  applyMobileUI();
+  initDriveOnPageLoad();
+  checkUrlEquipParam();
+}
+
+// Functie publica: schimba PIN-ul din setari
+function changePinFromSettings() {
+  sessionStorage.removeItem('ss_auth');
+  localStorage.removeItem('ss_pin_hash');
+  _pinMode = 'setup';
+  _showPinOverlay();
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────
+// Verifica autentificare: daca sesiunea e activa, porneste direct
+// Altfel afiseaza PIN overlay
+(function() {
+  const isAuth = sessionStorage.getItem('ss_auth') === '1';
+  if (isAuth) {
+    _startApp();
+  } else {
+    _showPinOverlay();
+  }
+})();
 </script>
 </body>
 </html>
