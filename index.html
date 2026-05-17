@@ -3830,8 +3830,15 @@ async function gasCallPost(params, timeoutMs = 20000) {
 
 // Sync complet la fiecare saveDB (debounced 3s)
 let _gasTimer = null;
+function _activeGasUrl() {
+  return (window._gasUrlOverride || localStorage.getItem('ss_gas_url') || GAS_URL || '').trim();
+}
+function _gasConfigured() {
+  const u = _activeGasUrl();
+  return !!(u && !u.includes('INLOCUIESTE'));
+}
 function _scheduleGasSync() {
-  if (!GAS_URL || GAS_URL.includes('INLOCUIESTE')) return;
+  if (!_gasConfigured()) return;
   if (_gasTimer) clearTimeout(_gasTimer);
   _gasTimer = setTimeout(gasSyncAll, 3000);
 }
@@ -3849,30 +3856,55 @@ async function gasSyncAll() {
   }
 }
 
-// Restore la pornire — dacă Sheets are date mai noi
+// Restore bidirectional la pornire — merge inteligent local + remote
 async function gasRestoreOnLoad() {
+  if (!_gasConfigured()) return false;
   try {
     const result = await gasCall({ action: 'getAll' }, 10000);
     if (!result || !result.ok) return false;
+
     const remoteEq  = result.equipment  || [];
     const remoteIns = result.inspections || [];
-    const remoteN   = remoteEq.length + remoteIns.length;
-    const localN    = db.equipment.length + db.inspections.length;
-    if (remoteN > localN) {
-      db.equipment   = remoteEq;
-      db.inspections = remoteIns;
+
+    // Daca ambele sunt goale — nu face nimic
+    if (remoteEq.length === 0 && remoteIns.length === 0 &&
+        db.equipment.length === 0 && db.inspections.length === 0) return false;
+
+    // Merge bidirectional: uneste local + remote, local castiga la conflict de ID
+    // (local e mai recent — a fost modificat de utilizator pe acest dispozitiv)
+    const mergedEq = mergeById(remoteEq, db.equipment);
+    const mergedIns = mergeById(remoteIns, db.inspections);
+
+    const changed = mergedEq.length !== db.equipment.length ||
+                    mergedIns.length !== db.inspections.length ||
+                    mergedEq.some((e,i) => JSON.stringify(e) !== JSON.stringify(db.equipment[i])) ||
+                    mergedIns.some((i,idx) => JSON.stringify(i) !== JSON.stringify(db.inspections[idx]));
+
+    if (changed) {
+      db.equipment   = mergedEq;
+      db.inspections = mergedIns;
       if (!db.customCatalog) db.customCatalog = [];
       localStorage.setItem(DB_KEY, JSON.stringify(db));
-      toast('🔄 Date sincronizate din Google Sheets (' + remoteEq.length + ' echipamente, ' + remoteIns.length + ' inspecții).', 'info');
-      return true;
+      toast('🔄 Date sincronizate (' + mergedEq.length + ' echipamente, ' + mergedIns.length + ' inspecții).', 'info');
     }
-    // Dacă local avem mai multe, sincronizăm Sheets
-    if (localN > 0) gasSyncAll();
-    return false;
+
+    // Trimite merged complet inapoi la GAS ca sa fie la zi
+    gasSyncAll();
+    return changed;
   } catch (e) {
-    console.warn('[GAS] Restore eșuat:', e.message);
+    console.warn('[GAS] Restore esuat:', e.message);
     return false;
   }
+}
+
+// Merge doua liste dupa .id: remote e baza, local suprascrie la conflict
+function mergeById(remote, local) {
+  const map = new Map();
+  // Pune remote primul
+  (remote || []).forEach(item => { if (item.id) map.set(item.id, item); });
+  // Local suprascrie (local e mai recent)
+  (local  || []).forEach(item => { if (item.id) map.set(item.id, item); });
+  return Array.from(map.values());
 }
 
 // Upload PDF prin GAS
@@ -3895,15 +3927,18 @@ function loadDB() {
     if (!db.equipment) db.equipment = [];
     if (!db.inspections) db.inspections = [];
     if (!db.customCatalog) db.customCatalog = [];
-  } catch(e) { db = { equipment: [], inspections: [] }; }
-  // Seed demo data if empty
-  if (db.equipment.length === 0) seedDemo();
+  } catch(e) { db = { equipment: [], inspections: [], customCatalog: [] }; }
+  // Seed demo data if empty — salveaza direct fara a declansa sync GAS
+  if (db.equipment.length === 0) {
+    seedDemo();
+    localStorage.setItem(DB_KEY, JSON.stringify(db)); // fara _scheduleGasSync
+  }
 }
 
 function saveDB() {
   localStorage.setItem(DB_KEY, JSON.stringify(db));
   updateSidebarCounts();
-  _scheduleGasSync(); // Sync automat în Sheets după fiecare salvare
+  _scheduleGasSync(); // Sync automat in Sheets dupa fiecare salvare reala
 }
 
 function genId() {
@@ -3930,7 +3965,7 @@ function seedDemo() {
 
   db.equipment = demo;
   db.inspections = inspections;
-  saveDB();
+  // Nu apela saveDB() aici — loadDB() salveaza direct fara a declansa sync GAS
 }
 
 // ═══════════════════════════════════════════════════════
@@ -4360,7 +4395,15 @@ function renderHistoryItem(ins) {
 function retireEquip(id) {
   if (!confirm('Retrage echipamentul din uz? Acesta nu va mai putea fi utilizat.')) return;
   const eq = db.equipment.find(e=>e.id===id);
-  if (eq) { eq.status = 'ret'; saveDB(); showDetail(id); toast('Echipament retras din uz.', 'info'); }
+  if (eq) {
+    eq.status = 'ret';
+    saveDB();
+    showDetail(id);
+    toast('Echipament retras din uz.', 'info');
+    // Salvare imediata in Sheets
+    gasCall({ action: 'saveEquipment', equipment: JSON.stringify(eq) })
+      .catch(e => console.warn('[GAS] saveEquipment retire:', e.message));
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -5338,11 +5381,29 @@ async function startNfcWrite(equipId) {
   const eq = db.equipment.find(e => e.id === equipId);
   if (!eq) { toast('Echipament negăsit.', 'error'); return; }
 
-  // Build the URL that will be written to the tag
-  // Uses current page URL as base so scanning opens the app directly on the equipment
-  const cfg = loadDriveConfig();
-  const base = cfg.appUrl || window.location.href.split('?')[0].split('#')[0];
-  const tagUrl = base + '?eq=' + encodeURIComponent(eq.id);
+  // Construieste URL-ul GAS cu token de securitate (nu mai duce direct in app)
+  const gasBase = (window._gasUrlOverride || localStorage.getItem('ss_gas_url') || GAS_URL || '').trim();
+  if (!gasBase || gasBase.includes('INLOCUIESTE')) {
+    toast('GAS URL nu este configurat. Configurează integrarea Google Sheets mai întâi.', 'error');
+    return;
+  }
+
+  // Obtine token de la GAS (hash MD5 pe baza eqId + secret server-side)
+  let token = '';
+  try {
+    const r = await gasCall({ action: 'getToken', eqId: eq.id });
+    if (r && r.ok) token = r.token;
+  } catch(e) {
+    console.warn('[GAS] getToken failed:', e.message);
+  }
+
+  if (!token) {
+    toast('Nu s-a putut genera token NFC. Verifică conexiunea GAS.', 'error');
+    return;
+  }
+
+  // URL-ul merge la GAS viewer — straini vad ultima inspectie, nu aplicatia
+  const tagUrl = gasBase + '?action=view&eq=' + encodeURIComponent(eq.id) + '&token=' + token;
 
   // Show overlay
   const overlay = document.getElementById('nfc-write-overlay');
@@ -5359,7 +5420,7 @@ async function startNfcWrite(equipId) {
       ${eq.manufacturer || ''} ${eq.model || ''}<br>
       Ultima inspecție: ${li ? formatDate(li.date) : 'Neinspectat'} &nbsp; ${statusBadge(eq.status)}
     </div>
-    <div style="margin-top:8px;font-size:10px;color:var(--text3);font-family:var(--font-m);word-break:break-all">URL: ${tagUrl}</div>
+    <div style="margin-top:8px;font-size:10px;color:var(--text3);font-family:var(--font-m);word-break:break-all">🔒 URL securizat cu token</div>
   `;
   document.getElementById('nfc-write-sub').textContent = 'Apropie tag-ul NTAG215/216 de spatele telefonului.';
   document.getElementById('nfc-write-progress').textContent = '⏳ Așteptând tag NFC...';
@@ -5372,15 +5433,10 @@ async function startNfcWrite(equipId) {
     const ndef = new NDEFReader();
     _nfcWriteController = new AbortController();
 
-    // On Android Chrome, NDEFReader.write() waits for a tag to come in range then writes
     document.getElementById('nfc-write-progress').textContent = '⏳ Apropie tag-ul...';
 
     await ndef.write(
-      {
-        records: [
-          { recordType: 'url', data: tagUrl }
-        ]
-      },
+      { records: [{ recordType: 'url', data: tagUrl }] },
       { signal: _nfcWriteController.signal, overwrite: true }
     );
 
@@ -5389,18 +5445,17 @@ async function startNfcWrite(equipId) {
     document.getElementById('nfc-write-icon').style.animation = 'none';
     document.getElementById('nfc-write-title').textContent = 'Tag scris cu succes!';
     document.getElementById('nfc-write-title').style.color = 'var(--green)';
-    document.getElementById('nfc-write-progress').textContent = '✅ Tag NFC programat! Scanează-l pentru a verifica.';
+    document.getElementById('nfc-write-progress').textContent = '✅ Tag NFC securizat! Strainii vor vedea doar ultima inspecție.';
     document.getElementById('nfc-write-progress').className = 'nfc-write-progress nfc-write-success';
     document.getElementById('nfc-write-cancel-btn').style.display = 'none';
     document.getElementById('nfc-write-done-btn').style.display = '';
     toast('📡 Tag NFC scris pentru ' + eq.name, 'success');
 
-    // Save tag written timestamp on equipment
     eq.nfcTagWritten = new Date().toISOString().slice(0,10);
     saveDB();
 
   } catch(e) {
-    if (e.name === 'AbortError') return; // user cancelled
+    if (e.name === 'AbortError') return;
     document.getElementById('nfc-write-icon').textContent = '❌';
     document.getElementById('nfc-write-icon').style.animation = 'none';
     document.getElementById('nfc-write-title').textContent = 'Eroare scriere';
@@ -5540,6 +5595,8 @@ function checkUrlEquipParam() {
   try {
     const params = new URLSearchParams(window.location.search);
     const eqId = params.get('eq');
+    // Daca URL-ul vine din GAS viewer (action=view + token) — ignora, e pentru straini
+    if (params.get('action') === 'view') return;
     if (eqId) {
       // wait for DB to load then open detail
       setTimeout(() => {
@@ -5771,11 +5828,17 @@ function saveEquip(existingId) {
     Object.assign(eq, getFormData());
     saveDB(); closeModal(); showDetail(existingId);
     toast('Echipament actualizat.', 'success');
+    // Salvare imediata in Sheets prin GAS
+    gasCall({ action: 'saveEquipment', equipment: JSON.stringify(eq) })
+      .catch(e => console.warn('[GAS] saveEquipment update:', e.message));
   } else {
     const eq = { id: genId(), ...getFormData(), status: document.getElementById('f-status')?.value || 'ok' };
     db.equipment.push(eq);
     saveDB(); closeModal();
     toast('Echipament adăugat: ' + eq.name, 'success');
+    // Salvare imediata in Sheets prin GAS
+    gasCall({ action: 'saveEquipment', equipment: JSON.stringify(eq) })
+      .catch(e => console.warn('[GAS] saveEquipment add:', e.message));
     if (window._returnToInspectAfterEquipAdd) {
       window._returnToInspectAfterEquipAdd = false;
       renderInspectForm(eq.id);
@@ -5863,9 +5926,16 @@ function importJSON(input) {
       if (!data.equipment) throw new Error('Format invalid');
       if (confirm(`Importă ${data.equipment.length} echipamente și ${data.inspections?.length||0} inspecții? Datele existente vor fi înlocuite.`)) {
         db = data;
+        if (!db.customCatalog) db.customCatalog = [];
         saveDB();
-        toast(`Import reușit: ${data.equipment.length} echipamente.`, 'success');
+        toast(`Import reușit: ${data.equipment.length} echipamente. Sincronizare GAS în curs...`, 'success');
         renderDashboard();
+        // Sync imediat complet dupa import
+        if (_gasConfigured()) {
+          if (_gasTimer) clearTimeout(_gasTimer);
+          gasSyncAll().then(() => toast('✅ Date importate sincronizate în Google Sheets.', 'success'))
+                      .catch(() => {});
+        }
       }
     } catch(err) {
       toast('Fișier JSON invalid.', 'error');
@@ -6785,7 +6855,12 @@ async function generateInspectionPDF(ins, returnBase64 = false) {
   }
 }
 
-async function driveUploadPdfBlob(pdfBase64, insId, date) { }
+async function driveUploadPdfBlob(pdfBase64, insId, date) {
+  // Delegat la gasUploadPdf — acelasi mecanism, fara OAuth separat
+  const pdfDate = date ? date.replace(/-/g, '') : new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const filename = 'PPE-INS-' + insId + '-' + pdfDate + '.pdf';
+  await gasUploadPdf(pdfBase64, filename);
+}
 
 
 // ── Auto-upload trigger ───────────────────────────────
@@ -6869,7 +6944,7 @@ function applyGasConfigToUI() {
 }
 
 function _updateGasStatusUI() {
-  const url = (window._gasUrlOverride || GAS_URL || '').trim();
+  const url = (window._gasUrlOverride || localStorage.getItem('ss_gas_url') || GAS_URL || '').trim();
   const icon = document.getElementById('gas-status-icon');
   const text = document.getElementById('gas-status-text');
   const active = url && !url.includes('INLOCUIESTE');
@@ -6878,6 +6953,9 @@ function _updateGasStatusUI() {
     text.textContent = active ? 'Activ — sync automat în Google Sheets' : 'Neconectat';
     text.style.color = active ? 'var(--green)' : 'var(--red)';
   }
+  // Actualizeaza inputul din UI cu URL-ul salvat
+  const inp = document.getElementById('gas-url-input');
+  if (inp && !inp.value && url && !url.includes('INLOCUIESTE')) inp.value = url;
 }
 
 async function gasTestConnection() {
