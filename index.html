@@ -1479,6 +1479,16 @@ textarea { resize: vertical; min-height: 80px; }
   #topbar-search { display: none; }
   .topbar-right .btn-text { display: none; }
   .topbar-right { gap: 6px; }
+  /* Home button compact on mobile */
+  .topbar-right button[onclick*="switchModule"] {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    gap: 5px !important;
+  }
+  /* Logo img smaller on mobile */
+  #topbar .logo img { height: 32px !important; }
+  /* Logo tagline hide on very small topbar */
+  #topbar .logo-tagline { font-size: 7px !important; letter-spacing: 1px !important; }
 
   /* Page titles */
   .page-title { font-size: 22px; }
@@ -1627,6 +1637,28 @@ textarea { resize: vertical; min-height: 80px; }
   width: 100%;
   text-align: justify;
   text-align-last: justify;
+}
+
+/* ── Extra mobile improvements ──────────────────────────── */
+@media (max-width: 768px) {
+  /* Ensure ppe-app fills screen */
+  #ppe-app { height: 100dvh; }
+  /* Alert items don't wrap type label */
+  .alert-date { font-size: 11px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Card in dashboard */
+  .card { border-radius: 10px; }
+  /* Equip table card view */
+  .equip-row { flex-wrap: wrap; }
+  /* Drive settings form */
+  .sg2, .sg3 { grid-template-columns: 1fr; }
+  /* Settings blocks */
+  .sblk { padding: 12px; }
+  /* Report stats */
+  .rstat-grid { grid-template-columns: 1fr 1fr; }
+  /* Inspect form heading */
+  .inspect-section-title { font-size: 13px; }
+  /* Photo grid */
+  .photo-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
 }
 </style>
 
@@ -1879,6 +1911,57 @@ textarea { resize: vertical; min-height: 80px; }
 #cert-app .pg{display:none;flex:1;overflow-y:auto;padding:1.5rem}
 #cert-app .pg.on{display:block}
 #cert-app .app{display:flex;flex:1;min-height:0;overflow:hidden;flex-direction:column}
+
+/* ── CertGen mobile ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  #cert-app #cert-topbar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  #cert-app #cert-topbar .logo { flex-shrink: 0; }
+  #cert-app #cert-topbar .logo img { height: 32px !important; }
+  #cert-app #cert-topbar .logo-name { font-size: 20px; }
+  #cert-app #cert-topbar .logo-tagline { font-size: 7px !important; letter-spacing: 1px !important; }
+  #cert-app .cert-nav-tabs {
+    order: 3;
+    width: 100%;
+    margin: 0;
+    gap: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+  }
+  #cert-app .cert-nav-tabs::-webkit-scrollbar { display: none; }
+  #cert-app .cert-tab {
+    padding: 6px 10px;
+    font-size: 11px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  #cert-app .cert-content { padding: 1rem; }
+  /* Home button in cert topbar — compact */
+  #cert-app .topbar-right button[onclick*="switchModule"] {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+  /* Wizard steps on mobile */
+  #cert-app .progress { gap: 0; }
+  #cert-app .pstep { min-width: 0; }
+  #cert-app .plbl { font-size: 9px; }
+  /* Preview area */
+  #cert-app #pvArea { max-width: 100%; overflow-x: auto; }
+  #cert-app .pv { transform: scale(0.85); transform-origin: top left; }
+  /* Download buttons */
+  #cert-app .dl-btns { flex-direction: column; gap: 8px; }
+  #cert-app .dlb { width: 100%; text-align: center; }
+}
+@media (max-width: 420px) {
+  #cert-app .cert-tab { padding: 5px 8px; font-size: 10px; }
+  #cert-app .plbl { display: none; }
+}
 </style>
 
 <!-- ══ LANDING PAGE CSS ══ -->
@@ -1962,6 +2045,45 @@ textarea { resize: vertical; min-height: 80px; }
 .landing-version {
   font-size:11px;color:var(--text3);letter-spacing:1px;
   position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);
+}
+
+/* ── Landing page mobile ─────────────────────────────────── */
+@media (max-width: 768px) {
+  #landing-page {
+    padding: 1.5rem 1rem;
+    gap: 1.5rem;
+    justify-content: flex-start;
+    padding-top: 3rem;
+    overflow-y: auto;
+  }
+  .landing-logo { gap: 12px; }
+  .landing-logo svg { width: 48px; }
+  .landing-logo .brand { font-size: 1.6rem; }
+  .landing-logo .tagline { font-size: 9px; }
+  .landing-modules {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    max-width: 100%;
+  }
+  .landing-card {
+    width: 100%;
+    max-width: 420px;
+    padding: 1.5rem 1.25rem;
+  }
+  .landing-card .lc-icon { width: 64px; height: 64px; }
+  .landing-card .lc-icon svg { width: 60px; height: 60px; }
+  .landing-card .lc-icon img { width: 60px; height: 60px; }
+  .landing-card .lc-title { font-size: 1.2rem; }
+  .landing-card .lc-desc { font-size: 12px; }
+  .landing-version { font-size: 10px; }
+  /* Install button on mobile */
+  #landing-install-btn { font-size: 11px; padding: 7px 18px; }
+}
+@media (max-width: 420px) {
+  .landing-card { padding: 1.25rem 1rem; }
+  .landing-logo .brand { font-size: 1.4rem; }
 }
 </style>
 </head>
