@@ -2234,7 +2234,7 @@ textarea { resize: vertical; min-height: 80px; }
     </div>
   </div>
   <div style="display:flex;flex-direction:column;align-items:center;gap:10px;position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:100;">
-  <button id="landing-install-btn" onclick="showPwaPrompt()" style="display:none;background:rgba(240,90,26,.2);border:1.5px solid #f05a1a;color:#f05a1a;padding:10px 28px;border-radius:24px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font-b);letter-spacing:.5px;transition:.2s;box-shadow:0 4px 20px rgba(240,90,26,.25);">
+  <button id="landing-install-btn" onclick="showPwaPrompt()" style="display:inline-block;background:rgba(240,90,26,.2);border:1.5px solid #f05a1a;color:#f05a1a;padding:10px 28px;border-radius:24px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font-b);letter-spacing:.5px;transition:.2s;box-shadow:0 4px 20px rgba(240,90,26,.25);">
     📲 Instalează ca aplicație
   </button>
   <div class="landing-version" style="position:static;transform:none;">v2.5.1 · SicherShield Platform</div>
@@ -3141,7 +3141,7 @@ function switchModule(mod) {
     }
     // Show install prompt
     if (typeof _pwaShouldShow === 'function' && _pwaShouldShow()) {
-      setTimeout(function() { if (typeof showPwaPrompt === 'function') showPwaPrompt(); }, 1200);
+      setTimeout(function() { if (typeof showPwaPrompt === 'function') showPwaPrompt(true); }, 1200);
     }
 
   }
@@ -9004,18 +9004,14 @@ function _pwaIsMobile() {
 
 // ── Always show install button on mobile ─────────────────────────────────────
 function _pwaShowLandingBtn(visible) {
+  // Button is always visible — this function kept for backward compat
+  if (!visible) return; // never hide the button
   const btn = document.getElementById('landing-install-btn');
-  if (btn) btn.style.display = visible ? 'inline-block' : 'none';
+  if (btn) btn.style.display = 'inline-block';
 }
 
 // Show button on mobile always, desktop only when beforeinstallprompt fires
-document.addEventListener('DOMContentLoaded', function() {
-  if (_pwaIsStandalone()) return;
-  if (_pwaIsMobile() && !localStorage.getItem(_PWA_INSTALLED_KEY)) {
-    // Always show on mobile
-    setTimeout(() => _pwaShowLandingBtn(true), 500);
-  }
-});
+// Install button always visible — no need to show dynamically
 
 // ── Chrome/Edge: native install prompt ────────────────────────────────────────
 window.addEventListener('beforeinstallprompt', function(e) {
@@ -9026,7 +9022,7 @@ window.addEventListener('beforeinstallprompt', function(e) {
   if (_pwaShouldShow()) {
     const landing = document.getElementById('landing-page');
     if (landing && landing.style.display !== 'none') {
-      setTimeout(showPwaPrompt, 1500);
+      setTimeout(function(){ showPwaPrompt(true); }, 1500);
     }
   }
 });
@@ -9054,8 +9050,12 @@ window.addEventListener('appinstalled', function() {
 })();
 
 // ── Public API ────────────────────────────────────────────────────────────────
-function showPwaPrompt() {
-  if (!_pwaShouldShow()) return;
+function showPwaPrompt(auto) {
+  // If auto-triggered, respect dismiss preference. Manual click always works.
+  if (auto && !_pwaShouldShow()) return;
+  // Don't show if already installed (standalone mode)
+  if (_pwaIsStandalone()) return;
+
   var overlay = document.getElementById('pwa-install-overlay');
   if (!overlay) return;
 
@@ -9068,15 +9068,15 @@ function showPwaPrompt() {
   overlay.style.display = 'flex';
 
   if (_pwaDeferred) {
-    // Chrome/Edge with native install available
-    var prompt = document.getElementById('pwa-android-prompt');
-    if (prompt) prompt.style.display = 'block';
+    // Chrome/Edge with native install available — show native dialog option
+    var p = document.getElementById('pwa-android-prompt');
+    if (p) p.style.display = 'block';
   } else if (_pwaIsIOS()) {
     // iOS Safari
     var hint = document.getElementById('pwa-ios-hint');
     if (hint) hint.style.display = 'block';
   } else {
-    // Chrome Android (file://) or any other browser — manual instructions
+    // Chrome Android (file://) or any other — show manual instructions
     var chromeHint = document.getElementById('pwa-chrome-hint');
     if (chromeHint) chromeHint.style.display = 'block';
   }
@@ -9090,19 +9090,28 @@ function hidePwaPrompt() {
 
 function pwaInstall() {
   if (_pwaDeferred) {
-    // Native Chrome install
+    // Native Chrome/Edge install dialog
     _pwaDeferred.prompt();
     _pwaDeferred.userChoice.then(function(choice) {
       if (choice.outcome === 'accepted') {
         if (typeof toast === 'function') toast('✓ Se instalează…', 'green');
+        localStorage.setItem(_PWA_INSTALLED_KEY, '1');
       }
       _pwaDeferred = null;
       hidePwaPrompt();
     }).catch(function() { hidePwaPrompt(); });
   } else {
-    // Show manual instructions
-    hidePwaPrompt();
-    setTimeout(showPwaPrompt, 100);
+    // No native prompt — switch to manual instructions panel
+    ['pwa-android-prompt','pwa-ios-hint'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    var overlay = document.getElementById('pwa-install-overlay');
+    if (overlay) overlay.style.display = 'flex';
+    var panel = _pwaIsIOS()
+      ? document.getElementById('pwa-ios-hint')
+      : document.getElementById('pwa-chrome-hint');
+    if (panel) panel.style.display = 'block';
   }
 }
 
