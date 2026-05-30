@@ -2238,10 +2238,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       <div class="lc-badge">🪢 Echipamente · Inspecții</div>
     </div>
   </div>
-  <div style="display:flex;flex-direction:column;align-items:center;gap:10px;position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:100;">
-  <button id="landing-install-btn" onclick="showPwaPrompt()" style="display:inline-block;background:rgba(240,90,26,.2);border:1.5px solid #f05a1a;color:#f05a1a;padding:10px 28px;border-radius:24px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font-b);letter-spacing:.5px;transition:.2s;box-shadow:0 4px 20px rgba(240,90,26,.25);">
-    📲 Instalează ca aplicație
-  </button>
+  <div style="position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:100;">
   <div class="landing-version" style="position:static;transform:none;">v2.5.1 · SicherShield Platform</div>
 </div>
 </div>
@@ -3208,9 +3205,9 @@ function restore(){try{const d=JSON.parse(localStorage.getItem('ss3')||'{}');if(
 /* ── COURSES ── */
 const C={
 '01':{id:'01',t:'cert',
-  DE:{title:'PSA-Training gegen Absturz',sub:'Persönliche Schutzausrüstung gegen Absturz',norm:'DGUV 112-198/199',dur:'8 Std./1 Tag',valid:'1 Jahr',topics:['Rechtliche Grundlagen gemäß DGUV 112-198/199','Auswahl und Einsatz von PSA gegen Absturz','Inspektion, Prüfung und Aussonderung','Rettungsplanung und Erste Hilfe','Praktische Übungen: Anlegen, Sicherung'],comp:'Befähigte Person für PSA gegen Absturz (PSAgA)'},
-  EN:{title:'PPE Fall Protection Training',sub:'Personal Protective Equipment against Falls',norm:'DGUV 112-198/199',dur:'8 hrs/1 day',valid:'1 year',topics:['Legal framework under DGUV 112-198/199','Selection and proper use of fall-arrest PPE','Inspection, testing and withdrawal','Rescue planning and first aid','Practical exercises: donning, securing'],comp:'Competent Person – PPE Fall Arrest (PSAgA)'},
-  RO:{title:'Instruire EIP împotriva căderii',sub:'Echipament individual de protecție anticădere',norm:'DGUV 112-198/199',dur:'8 ore/1 zi',valid:'1 an',topics:['Cadrul legal conform DGUV 112-198/199','Selectarea și utilizarea EIP anticădere','Inspecție, verificare și scoatere din uz','Planificarea salvării și primul ajutor','Exerciții practice: echipare, ancorare'],comp:'Persoană competentă – EIP anticădere (PSAgA)'}},
+  DE:{title:'PSA-Training gegen Absturz',sub:'Persönliche Schutzausrüstung gegen Absturz',norm:'DGUV 112-198/199',dur:'8 Std./1 Tag',valid:'1 Jahr',topics:['Rechtliche Grundlagen & Pflichten gemäß DGUV 112-198/199','Auswahl und Einsatz von PSA gegen Absturz','Inspektion, Prüfung und Aussonderung der Ausrüstung','Rettungsplanung und Erste Hilfe nach einem Absturz','Praktische Übungen: Anlegen, Sicherung, Ankerpunkte'],comp:'Befähigte Person für PSA gegen Absturz (PSAgA)'},
+  EN:{title:'PPE Fall Protection Training',sub:'Personal Protective Equipment against Falls',norm:'DGUV 112-198/199',dur:'8 hrs/1 day',valid:'1 year',topics:['Legal framework & duties under DGUV 112-198/199','Selection and proper use of fall-arrest PPE','Inspection, testing and withdrawal from service','Rescue planning and first aid following a fall','Practical exercises: donning, securing, anchor points'],comp:'Competent Person – PPE Fall Arrest (PSAgA)'},
+  RO:{title:'Instruire EIP împotriva căderii',sub:'Echipament individual de protecție anticădere',norm:'DGUV 112-198/199',dur:'8 ore/1 zi',valid:'1 an',topics:['Cadrul legal și obligații conform DGUV 112-198/199','Selectarea și utilizarea corectă a EIP anticădere','Inspecție, verificare și scoatere din uz','Planificarea salvării și primul ajutor după cădere','Exerciții practice: echipare, ancorare, puncte de fixare'],comp:'Persoană competentă – EIP anticădere (PSAgA)'}},
 '04':{id:'04',t:'cert',
   DE:{title:'EuP-Schulung',sub:'Elektrotechnisch unterwiesene Person',norm:'DIN VDE 0105-100',dur:'8 Std./1 Tag',valid:'2 Jahre',topics:['Grundlagen Elektrotechnik & Schutzmaßnahmen','Normen gemäß DIN VDE 0105-100','Gefahren durch elektrischen Strom','Verhaltensregeln bei elektr. Anlagen','Erste Hilfe bei Elektrounfällen'],comp:'Elektrotechnisch unterwiesene Person (EuP)'},
   EN:{title:'EuP Electrical Safety Training',sub:'Electrically Instructed Person',norm:'DIN VDE 0105-100',dur:'8 hrs/1 day',valid:'2 years',topics:['Fundamentals of electrical engineering','Standards under DIN VDE 0105-100','Hazards of electric current','Rules near electrical installations','First aid for electrical accidents'],comp:'Electrically Instructed Person (EuP)'},
