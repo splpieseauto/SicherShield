@@ -5540,10 +5540,19 @@ function loadDB() {
     if (!db.inspections) db.inspections = [];
     if (!db.customCatalog) db.customCatalog = [];
   } catch(e) { db = { equipment: [], inspections: [], customCatalog: [] }; }
-  // Seed demo data if empty — salveaza direct fara a declansa sync GAS
-  if (db.equipment.length === 0) {
+  // Sterge datele demo daca exista (ID-urile EQ-001..EQ-006 din seed-ul anterior)
+  const demoIds = ['EQ-001','EQ-002','EQ-003','EQ-004','EQ-005','EQ-006'];
+  const hasDemoData = db.equipment.some(e => demoIds.includes(e.id));
+  if (hasDemoData) {
+    db.equipment = [];
+    db.inspections = [];
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+  }
+  // Seed (acum gol) daca nu exista nimic
+  if (db.equipment.length === 0 && db.inspections.length === 0 && !localStorage.getItem(DB_KEY + '_seeded')) {
     seedDemo();
-    localStorage.setItem(DB_KEY, JSON.stringify(db)); // fara _scheduleGasSync
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+    localStorage.setItem(DB_KEY + '_seeded', '1');
   }
 }
 
@@ -5558,25 +5567,8 @@ function genId() {
 }
 
 function seedDemo() {
-  const demo = [
-    { id:'EQ-001', name:'Ham Black Diamond Momentum', type:'Ham', serial:'BD-HAM-2023-0042', manufacturer:'Black Diamond', model:'Momentum', purchaseDate:'2023-03-15', manufactureDate:'2022-11-01', norm:'EN 361', lifespan:10, status:'ok', location:'Sala Colt', owner:'Ion Popescu', notes:'Utilizat intensiv pe via ferrata' },
-    { id:'EQ-002', name:'Carabiniera Petzl Am\'D', type:'Carabiniera', serial:'PTZL-AMD-7891', manufacturer:'Petzl', model:"Am'D", purchaseDate:'2022-06-10', manufactureDate:'2022-01-15', norm:'EN 362', lifespan:10, status:'ok', location:'Depozit A', owner:'Maria Ionescu', notes:'' },
-    { id:'EQ-003', name:'Coardă Mammut Serenity 8.7', type:'Coarda', serial:'MMT-SER-2021-003', manufacturer:'Mammut', model:'Serenity 8.7', purchaseDate:'2021-09-01', manufactureDate:'2021-06-01', norm:'EN 892', lifespan:10, status:'warn', location:'Sala Colt', owner:'Club Alpin', notes:'Prezintă uzură locală la m. 25' },
-    { id:'EQ-004', name:'Cască Petzl Meteor', type:'Casca', serial:'PTZL-MET-4523', manufacturer:'Petzl', model:'Meteor', purchaseDate:'2020-04-20', manufactureDate:'2020-01-10', norm:'EN 12492', lifespan:10, status:'warn', location:'Sala Colt', owner:'Radu Georgescu', notes:'Apropiata de limita duratei de utilizare' },
-    { id:'EQ-005', name:'Grigri Petzl +', type:'Dispozitiv asigurare', serial:'PTZL-GRI-8812', manufacturer:'Petzl', model:'Grigri+', purchaseDate:'2023-01-05', manufactureDate:'2022-10-01', norm:'EN 15151', lifespan:10, status:'ok', location:'Depozit B', owner:'Club Alpin', notes:'' },
-    { id:'EQ-006', name:'Ham Petzl Corax retras', type:'Ham', serial:'PTZL-CRX-0011', manufacturer:'Petzl', model:'Corax', purchaseDate:'2015-08-12', manufactureDate:'2015-04-01', norm:'EN 361', lifespan:10, status:'ret', location:'Retras', owner:'Arhivă', notes:'Retras din uz — depășit durata de utilizare' },
-  ];
-
-  const inspections = [
-    { id:'INS-001', equipId:'EQ-001', date:'2024-11-10', inspector:'Ion Popescu', verdict:'ok', checks:{ 'Inele V/D-ring':'ok','Cusături':'ok','Benzi':'ok','Catarame':'ok','Etichete':'ok' }, note:'Totul în ordine.' },
-    { id:'INS-002', equipId:'EQ-003', date:'2024-10-15', inspector:'Maria Ionescu', verdict:'warn', checks:{ 'Miez':'ok','Manta':'warn','Capete':'ok','Marcaj mijloc':'ok','Rigiditate':'ok' }, note:'Uzură manta km 25. Monitorizare necesară.' },
-    { id:'INS-003', equipId:'EQ-004', date:'2024-09-01', inspector:'Radu Georgescu', verdict:'warn', checks:{ 'Shell':'ok','Sistem reglaj':'ok','Chinstrap':'ok','Interior absorbant':'ok','Marcaje':'warn' }, note:'Marcajele dată fabricație sunt parțial lizibile.' },
-    { id:'INS-004', equipId:'EQ-002', date:'2024-12-01', inspector:'Ion Popescu', verdict:'ok', checks:{ 'Corp':'ok','Capăt siguranță':'ok','Sistem blocare':'ok','Marcaje':'ok','Uzură':'ok' }, note:'' },
-    { id:'INS-005', equipId:'EQ-005', date:'2025-01-15', inspector:'Club Alpin', verdict:'ok', checks:{ 'Corp':'ok','Funcționare':'ok','Cablu/arc':'ok','Marcaje':'ok' }, note:'Verificare periodică OK.' },
-  ];
-
-  db.equipment = demo;
-  db.inspections = inspections;
+  db.equipment = [];
+  db.inspections = [];
   // Nu apela saveDB() aici — loadDB() salveaza direct fara a declansa sync GAS
 }
 
