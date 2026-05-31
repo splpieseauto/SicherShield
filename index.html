@@ -3788,6 +3788,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // ── Google Apps Script URL — ZERO OAuth, zero popup ──────────────────
   // Înlocuiește cu URL-ul generat după deployment în script.google.com
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbzJ22eW5X-h0WjcHT5ZY0sDn8BRFmm-y545uLzEpLsfGVbcScOPYFP2fZVEjpRqu1Zj/exec';
+  window._GAS_URL = GAS_URL; // expus global pentru alte module (CertGen, sync status)
 
   // ── Păstrat pentru compatibilitate Drive (PDF upload direct) ──────────
   const DRIVE_CLIENT_ID = '826960469113-sh9m91nlhcd3h42321c10a2mn04r1juv.apps.googleusercontent.com';
@@ -5419,6 +5420,16 @@ let db = { equipment: [], inspections: [] };
 // Funcționează de pe orice dispozitiv fără autentificare
 // ═══════════════════════════════════════════════════════════════
 
+// Parseaza raspuns GAS — poate fi JSONP: cb({...}); sau JSON pur: {...}
+function _parseGasResponse(txt) {
+  if (!txt || !txt.trim()) throw new Error('Raspuns gol GAS');
+  const t = txt.trim();
+  // JSONP format: cb({...}); sau orice callback({...});
+  const m = t.match(/^[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(([\s\S]+)\)\s*;?\s*$/);
+  if (m) return JSON.parse(m[1]);
+  return JSON.parse(t);
+}
+
 async function gasCall(params, timeoutMs = 15000) {
   const url = (window._gasUrlOverride || localStorage.getItem('ss_gas_url') || GAS_URL || window._GAS_URL || '').trim();
   if (!url || url.includes('INLOCUIESTE')) {
@@ -5435,11 +5446,8 @@ async function gasCall(params, timeoutMs = 15000) {
     ]);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const txt = await r.text();
-    if (!txt || !txt.trim()) throw new Error('Răspuns gol GAS');
-    return JSON.parse(txt);
+    return _parseGasResponse(txt);
   } catch (e) {
-    // Failed to fetch = rețea indisponibilă — nu e eroare de logat ca warning
-    if (e.name === 'AbortError' || e.name === 'TypeError') throw e;
     throw e;
   }
 }
@@ -5470,7 +5478,7 @@ async function gasCallPost(params, timeoutMs = 20000) {
 // Sync complet la fiecare saveDB (debounced 3s)
 let _gasTimer = null;
 function _activeGasUrl() {
-  return (window._gasUrlOverride || localStorage.getItem('ss_gas_url') || GAS_URL || '').trim();
+  return (window._gasUrlOverride || localStorage.getItem('ss_gas_url') || (typeof GAS_URL !== 'undefined' ? GAS_URL : '') || window._GAS_URL || '').trim();
 }
 function _gasConfigured() {
   const u = _activeGasUrl();
