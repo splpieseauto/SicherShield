@@ -2249,6 +2249,8 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         <span id="ppe-sync-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .3s;"></span>
         <span id="ppe-sync-label" style="white-space:nowrap;">—</span>
       </div>
+      <!-- Realtime live indicator -->
+      <span id="rt-sync-badge" title="Sync timp real" style="font-size:15px;line-height:1;color:var(--text3);cursor:default;transition:color .4s;">○</span>
       <span style="width:1px;height:14px;background:rgba(255,255,255,.15);flex-shrink:0;"></span>
       <!-- Refresh both -->
       <button
@@ -5421,12 +5423,18 @@ async function gasSyncAll() {
     };
     const result = await gasCallPost({ action: 'syncAll', data: JSON.stringify(dbForSync) });
     if (result && result.ok) {
+      const now = new Date().toLocaleString('ro-RO', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
       const el = document.getElementById('gas-last-sync');
-      if (el) el.textContent = new Date().toLocaleString('ro-RO', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+      if (el) el.textContent = now;
+      // Update realtime indicator
+      _rtSetStatus('ok', 'Sync ' + now);
+      // Store hash of what we just pushed so poll knows baseline
+      _rtLastHash = _rtHashDB();
       console.log('[GAS] Sync OK —', result.equipment, 'echipamente,', result.inspections, 'inspecții');
     }
   } catch (e) {
     _gasWarn('[GAS] Sync eșuat:', e);
+    _rtSetStatus('error', 'Eroare sync');
   }
 }
 
@@ -5457,6 +5465,7 @@ async function gasRestoreOnLoad() {
       if (!db.customCatalog) db.customCatalog = [];
       localStorage.setItem(DB_KEY, JSON.stringify(db));
       toast('🔄 Date sincronizate (' + mergedEq.length + ' echipamente, ' + mergedIns.length + ' inspecții).', 'info');
+      _rtLastHash = _rtHashDB();
     }
 
     gasSyncAll();
@@ -5465,6 +5474,157 @@ async function gasRestoreOnLoad() {
     _gasWarn('[GAS] Restore esuat:', e);
     return false;
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SINCRONIZARE ÎN TIMP REAL — polling inteligent cu detecție hash
+// Interval activ: 15s  |  Fundal (tab ascuns): 60s
+// ═══════════════════════════════════════════════════════════════
+let _rtPollTimer    = null;
+let _rtLastHash     = '';
+let _rtIsPolling    = false;
+let _rtConsecErrors = 0;
+const _RT_ACTIVE_MS  = 15000;   // 15 secunde când tabul e activ
+const _RT_BG_MS      = 60000;   // 60 secunde când tabul e în fundal
+const _RT_MAX_ERR    = 5;       // pauze de backoff după 5 erori consecutive
+
+// Calculează un hash simplu (lungime + câmpuri cheie) pentru a detecta schimbări fără a compara JSON complet
+function _rtHashDB() {
+  const eqH = db.equipment.map(e => e.id + '|' + (e.status||'') + '|' + (e.updatedAt||'')).join(',');
+  const inH = db.inspections.map(i => i.id + '|' + (i.verdict||'') + '|' + (i.date||'')).join(',');
+  return db.equipment.length + ':' + db.inspections.length + ':' + eqH.length + ':' + inH.length;
+}
+
+// Actualizează indicatorul de sync din UI (bară landing + pagina settings)
+function _rtSetStatus(state, label) {
+  // Landing bar — PPE dot/label
+  _setSyncStatus('ppe-sync-dot', 'ppe-sync-label', state, label);
+  // Settings page indicator
+  const icon = document.getElementById('gas-status-icon');
+  const text = document.getElementById('gas-status-text');
+  const states = { ok:'🟢', loading:'🔄', error:'🔴', off:'⚪' };
+  if (icon) icon.textContent = states[state] || '⚪';
+  if (text) {
+    text.textContent = label || '';
+    text.style.color = state === 'ok' ? 'var(--green)' : state === 'error' ? 'var(--red)' : 'var(--text3)';
+  }
+  // Realtime badge în header/nav dacă există
+  const rtBadge = document.getElementById('rt-sync-badge');
+  if (rtBadge) {
+    rtBadge.textContent = state === 'ok' ? '●' : state === 'loading' ? '◌' : '○';
+    rtBadge.style.color = state === 'ok' ? 'var(--green)' : state === 'error' ? 'var(--red)' : 'var(--text3)';
+    rtBadge.title = 'Sync timp real: ' + label;
+  }
+}
+
+// O iterație de poll: trage datele din GAS și aplică dacă s-au schimbat
+async function _rtPollOnce() {
+  if (!_gasConfigured() || _rtIsPolling) return;
+  _rtIsPolling = true;
+  try {
+    _rtSetStatus('loading', 'Se verifică…');
+    const result = await gasCall({ action: 'getAll' }, 12000);
+    if (!result || !result.ok) {
+      _rtConsecErrors++;
+      _rtSetStatus('error', 'Eroare ' + new Date().toLocaleTimeString('ro-RO', {hour:'2-digit',minute:'2-digit'}));
+      return;
+    }
+    _rtConsecErrors = 0;
+
+    const remoteEq  = result.equipment  || [];
+    const remoteIns = result.inspections || [];
+
+    // Merge remote → local (remote e sursa de adevăr pentru alte dispozitive)
+    const mergedEq  = mergeById(remoteEq,  db.equipment);
+    const mergedIns = mergeById(remoteIns, db.inspections);
+
+    // Construiește hash-ul noului stat
+    const prevEq  = db.equipment;
+    const prevIns = db.inspections;
+    db.equipment   = mergedEq;
+    db.inspections = mergedIns;
+    const newHash = _rtHashDB();
+    db.equipment   = prevEq;
+    db.inspections = prevIns;
+
+    if (newHash !== _rtLastHash) {
+      // Au apărut date noi de pe alt dispozitiv — aplică
+      db.equipment   = mergedEq;
+      db.inspections = mergedIns;
+      if (!db.customCatalog) db.customCatalog = [];
+      localStorage.setItem(DB_KEY, JSON.stringify(db));
+      _rtLastHash = newHash;
+
+      // Re-randează UI-ul paginii curente
+      _rtRefreshUI();
+
+      const now = new Date().toLocaleTimeString('ro-RO', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      const el = document.getElementById('gas-last-sync');
+      if (el) el.textContent = now;
+      _rtSetStatus('ok', '● Live · ' + now);
+      toast('🔄 Date noi de pe alt dispozitiv (' + mergedEq.length + ' echip., ' + mergedIns.length + ' insp.)', 'info');
+      console.log('[RT-SYNC] Schimbare detectată → UI actualizat', now);
+    } else {
+      const now = new Date().toLocaleTimeString('ro-RO', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      _rtSetStatus('ok', '● Live · ' + now);
+    }
+  } catch (e) {
+    _rtConsecErrors++;
+    _gasWarn('[RT-SYNC] Poll eșuat:', e);
+    _rtSetStatus('error', 'Offline · reîncercare…');
+  } finally {
+    _rtIsPolling = false;
+  }
+}
+
+// Re-randează pagina curentă fără a pierde starea utilizatorului
+function _rtRefreshUI() {
+  updateSidebarCounts();
+  if (typeof currentPage !== 'undefined') {
+    try {
+      if (currentPage === 'dashboard')   renderDashboard();
+      if (currentPage === 'equipment')   renderEquipTable();
+      if (currentPage === 'alerts')      renderAlerts();
+      if (currentPage === 'reports')     renderReportStats();
+    } catch(e) { console.warn('[RT-SYNC] renderUI error:', e); }
+  }
+}
+
+// Pornește sau restarteaza polling-ul
+function _rtStartPolling() {
+  if (!_gasConfigured()) return;
+  _rtStopPolling();
+  const ms = document.hidden ? _RT_BG_MS : _RT_ACTIVE_MS;
+  // Backoff exponential la erori consecutive
+  const backoff = _rtConsecErrors >= _RT_MAX_ERR ? Math.min(_rtConsecErrors * 10000, 120000) : 0;
+  _rtPollTimer = setInterval(_rtPollOnce, ms + backoff);
+  console.log('[RT-SYNC] Polling pornit —', (ms + backoff) / 1000 + 's interval' + (backoff ? ' (backoff)' : ''));
+}
+
+function _rtStopPolling() {
+  if (_rtPollTimer) { clearInterval(_rtPollTimer); _rtPollTimer = null; }
+}
+
+// Schimbă intervalul când tabul intră/iese din fundal (Page Visibility API)
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) {
+    // Tabul redevine activ — sync imediat + interval scurt
+    console.log('[RT-SYNC] Tab activ → sync imediat + interval', _RT_ACTIVE_MS/1000 + 's');
+    _rtPollOnce();
+    _rtStartPolling();
+  } else {
+    // Tabul intră în fundal — interval lung pentru economie
+    console.log('[RT-SYNC] Tab fundal → interval', _RT_BG_MS/1000 + 's');
+    _rtStartPolling();
+  }
+});
+
+// Inițializare: pornit din initDriveOnPageLoad după primul restore
+function _rtInit() {
+  if (!_gasConfigured()) return;
+  _rtLastHash = _rtHashDB();
+  _rtStartPolling();
+  console.log('[RT-SYNC] Motor pornit · hash baseline:', _rtLastHash);
 }
 
 // Merge doua liste dupa .id: remote e baza, local suprascrie la conflict
@@ -8819,6 +8979,8 @@ function initDriveOnPageLoad() {
   // Restore din Sheets la pornire (fără OAuth, fără popup)
   gasRestoreOnLoad().then(restored => {
     if (restored) { renderDashboard(); updateSidebarCounts(); }
+    // Pornește motorul de sincronizare în timp real după primul restore
+    _rtInit();
   });
   // Backup JSON zilnic la pornire (max o data la 23h)
   _maybeDailyJsonBackup();
@@ -9136,11 +9298,13 @@ async function ppeRefreshSync() {
   try {
     const ok = await _pingGAS('ppe-sync-dot', 'ppe-sync-label');
     if (ok && typeof gasRestoreOnLoad === 'function') {
-      const changed = await gasRestoreOnLoad();
+      // Force full poll cycle and restart interval
+      _rtStopPolling();
+      await _rtPollOnce();
+      _rtStartPolling();
       if (typeof renderDashboard === 'function') renderDashboard();
       if (typeof renderEquipTable === 'function') renderEquipTable();
       if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
-      if (!changed && typeof toast === 'function') toast('✅ Date actualizate — nicio modificare nouă.', 'info');
     } else if (!ok) {
       if (typeof toast === 'function') toast('⚠️ Nu s-a putut conecta la Spreadsheet.', 'error');
     }
