@@ -1832,7 +1832,7 @@ textarea { resize: vertical; min-height: 80px; }
 #cert-app .pvcomp .cl2{font-size:10px;color:var(--gray2);text-transform:uppercase;letter-spacing:1px}
 #cert-app .pvcomp .cv{font-size:12px;font-weight:700;color:var(--orange);margin-top:3px}
 #cert-app .pvsigs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-#cert-app .pvsig{border-top:2px solid var(--orange);padding-top:5px;text-align:center;font-size:10px;color:var(--silv2)}
+#cert-app .pvsig{border-top:2px solid var(--orange);padding-top:5px;text-align:center;font-size:10px;color:var(--silv2);min-height:52px;position:relative}
 #cert-app .pvfoot{background:var(--navy3);border-top:1px solid rgba(232,119,34,.2);padding:6px 14px;text-align:center;font-size:10px;color:var(--gray2)}
 
 /* STEP NAV */
@@ -2413,14 +2413,40 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
 
   <div class="sc">
     <h3>✍️ Trainer &amp; Stempel / Trainer &amp; Stamp</h3>
-    <div class="sg3">
+    <div class="sg3" style="margin-bottom:14px">
       <div class="fg"><label>Trainer Name</label><input type="text" id="s-tn" placeholder="Max Mustermann"></div>
-      <div class="fg"><label>Qualifikation / Qualification</label><input type="text" id="s-tq" placeholder="DGUV-Trainer, Sifa"></div>
       <div class="fg"><label>Registrierungs-Nr. / Reg. No.</label><input type="text" id="s-tr" placeholder="TR-12345"></div>
       <div class="fg"><label>Stempel-Nr. / Stamp No.</label><input type="text" id="s-sn" placeholder="ST-2025-001"></div>
-      <div class="fg"><label>Stempel / Stamp Zeile / Line 1</label><input type="text" id="s-s1" placeholder="SicherShield SRL"></div>
-      <div class="fg"><label>Stempel / Stamp Zeile / Line 2</label><input type="text" id="s-s2" placeholder="Zert. Schulungsträger"></div>
     </div>
+    <p style="font-size:12px;color:var(--gray);margin:0 0 8px"><strong>Qualifikation / Qualification</strong> &mdash; per Kurstyp / per course type:</p>
+    <div class="sg2" style="margin-bottom:14px">
+      <div class="fg"><label>SS-01 &middot; PSA Training</label><input type="text" id="s-tq01" placeholder="DGUV-Trainer PSAgA, Befähigte Person"></div>
+      <div class="fg"><label>SS-04 &middot; EuP-Schulung</label><input type="text" id="s-tq04" placeholder="Elektrofachkraft, VEFK"></div>
+      <div class="fg"><label>SS-05 &middot; Arbeitsschutz</label><input type="text" id="s-tq05" placeholder="Sifa, Fachkraft f. Arbeitssicherheit"></div>
+      <div class="fg"><label>SS-10 &middot; Erste Hilfe</label><input type="text" id="s-tq10" placeholder="Ersthelfer-Ausbilder, DRK-Trainer"></div>
+    </div>
+    <p style="font-size:12px;color:var(--gray);margin:0 0 8px"><strong>Stempel / Stamp image</strong> &mdash; sync automat pe toate dispozitivele via Google Drive:</p>
+    <div style="display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px">
+        <div class="fg" style="margin-bottom:10px"><label>Stempel Zeile / Line 1</label><input type="text" id="s-s1" placeholder="SicherShield SRL"></div>
+        <div class="fg"><label>Stempel Zeile / Line 2</label><input type="text" id="s-s2" placeholder="Zert. Schulungsträger"></div>
+        <div id="stamp-sync-status" style="margin-top:8px;font-size:11px;color:var(--gray);min-height:16px"></div>
+      </div>
+      <div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:7px">
+        <span style="font-size:11px;color:var(--gray);font-weight:600;text-transform:uppercase;letter-spacing:.05em">Stamp Image</span>
+        <div id="stamp-preview-wrap" onclick="document.getElementById('stamp-file-input').click()" style="width:96px;height:96px;border:2px dashed var(--orange);border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(232,119,34,.06);overflow:hidden;cursor:pointer" title="Click to upload">
+          <img id="stamp-preview-img" style="max-width:92px;max-height:92px;display:none;object-fit:contain" alt="stamp">
+          <span id="stamp-preview-placeholder" style="font-size:30px;opacity:.45">&#128278;</span>
+        </div>
+        <input type="file" id="stamp-file-input" accept="image/*" style="display:none" onchange="handleStampUpload(this)">
+        <div style="display:flex;gap:6px">
+          <button class="sbtn" style="font-size:10px;padding:4px 10px" onclick="document.getElementById('stamp-file-input').click()">Upload</button>
+          <button class="sbtn g" style="font-size:10px;padding:4px 10px" onclick="clearStampImage()">Sterge</button>
+        </div>
+        <span style="font-size:10px;color:var(--gray);text-align:center;line-height:1.4">PNG/JPG max 2MB<br>&#9729; sync all devices</span>
+      </div>
+    </div>
+  </div>
   </div>
 
   <div class="sc">
@@ -3145,7 +3171,7 @@ function certToast(msg, type) {
 const LOGO=window._LOGO;
 
 /* ── DEFAULTS ── */
-const DS={co:'SicherShield SRL',cui:'CUI RO12345678',reg:'J40/12345/2024',adr:'Str. Ciprian Porumbescu nr. 76',city:'Timișoara, România',tel:'',em1:'training@sichershield.de',em2:'office@sichershield.de',url:'sicher-cinematic-vision.lovable.app/verificare-certificate',tn:'',tq:'',tr:'',sn:'',s1:'',s2:''};
+const DS={co:'SicherShield SRL',cui:'CUI RO12345678',reg:'J40/12345/2024',adr:'Str. Ciprian Porumbescu nr. 76',city:'Timișoara, România',tel:'',em1:'training@sichershield.de',em2:'office@sichershield.de',url:'sicher-cinematic-vision.lovable.app/verificare-certificate',tn:'',tq:'',tq01:'',tq04:'',tq05:'',tq10:'',tr:'',sn:'',s1:'',s2:'',stampImg:''};
 const DSER={'01':'PSA-2025','04':'EUP-2025','05':'AS-2025','10':'EH-2025'};
 const DCNT={'01':1,'04':1,'05':1,'10':1};
 
@@ -3153,8 +3179,19 @@ const DCNT={'01':1,'04':1,'05':1,'10':1};
 let S={step:0,fn:'',ln:'',date:'',pos:'',co2:'',dept:'',course:null,langs:[],hist:[],sets:{...DS},ser:{...DSER},cnt:{...DCNT}};
 
 /* ── PERSIST ── */
-function persist(){try{localStorage.setItem('ss3',JSON.stringify({hist:S.hist,sets:S.sets,ser:S.ser,cnt:S.cnt}))}catch(e){}}
-function restore(){try{const d=JSON.parse(localStorage.getItem('ss3')||'{}');if(d.hist)S.hist=d.hist;if(d.sets)S.sets={...DS,...d.sets};if(d.ser)S.ser={...DSER,...d.ser};if(d.cnt)S.cnt={...DCNT,...d.cnt}}catch(e){}}
+function persist(){
+  try{
+    const p={hist:S.hist,sets:Object.assign({},S.sets,{stampImg:''}),ser:S.ser,cnt:S.cnt};
+    localStorage.setItem('ss3',JSON.stringify(p));
+    if(S.sets.stampImg)localStorage.setItem('ss_stamp_img',S.sets.stampImg);
+    else localStorage.removeItem('ss_stamp_img');
+  }catch(e){}
+  _scheduleSettingsSync();
+}
+function restore(){
+  try{const d=JSON.parse(localStorage.getItem('ss3')||'{}');if(d.hist)S.hist=d.hist;if(d.sets)S.sets=Object.assign({},DS,d.sets);if(d.ser)S.ser=Object.assign({},DSER,d.ser);if(d.cnt)S.cnt=Object.assign({},DCNT,d.cnt);}catch(e){}
+  S.sets.stampImg=localStorage.getItem('ss_stamp_img')||'';
+}
 
 /* ── COURSES ── */
 const C={
@@ -3234,7 +3271,7 @@ function fullName(){
   const ln=(S.ln||document.getElementById('inp-ln')?.value||'').trim();
   return (fn+' '+ln).trim()||'— Name —';
 }
-function trainerLine(){const s=S.sets;return s.tn?(s.tn+(s.tq?' · '+s.tq:'')+(s.tr?' ('+s.tr+')':'')):null}
+function trainerLine(cid){const s=S.sets;const tq=(cid&&s['tq'+cid])||s.tq||'';return s.tn?(s.tn+(tq?' · '+tq:'')+(s.tr?' ('+s.tr+')':'')):null}
 function stampLine(){const s=S.sets;return(s.sn?'Nr.'+s.sn+' ':'')+( s.s1||'')}
 
 /* ── PAGE NAV ── */
@@ -3335,7 +3372,7 @@ function renderPV(){
   if(!S.course||!S.langs.length){document.getElementById('pvArea').innerHTML='';return;}
   const lang=S.langs[0],c=C[S.course],d=c[lang],t=T[lang];
   const no=certNo(S.course),name=fullName();
-  const trl=trainerLine()||t.sigT,stl=stampLine()||t.stamp;
+  const trl=trainerLine(S.course)||t.sigT,stl=stampLine()||t.stamp;
   const footer=`${S.sets.co} · ${S.sets.cui} · ${S.sets.adr}, ${S.sets.city}`;
   const isCert=c.t==='cert';
   document.getElementById('pvArea').innerHTML=`
@@ -3360,7 +3397,7 @@ function renderPV(){
         <div class="pvmb"><div class="ml">${t.vld}</div><div class="mv" style="color:var(--orng2)">${validUntil(d.valid)}</div></div>
       </div>
       ${isCert&&d.topics?`<div class="pvtopics"><div class="tl">◆ ${t.topics}</div><ul>${d.topics.map(x=>`<li>${x}</li>`).join('')}</ul></div><div class="pvcomp"><div class="cl2">◆ ${t.comp}</div><div class="cv">${d.comp}</div></div>`:''}
-      <div class="pvsigs"><div class="pvsig">${t.sigP}</div><div class="pvsig">${trl}</div><div class="pvsig">${stl}</div></div>
+      <div class="pvsigs"><div class="pvsig">${t.sigP}</div><div class="pvsig">${trl}</div>${S.sets.stampImg?`<div class="pvsig" style="padding-top:42px;position:relative"><img src="${S.sets.stampImg}" style="position:absolute;top:3px;left:50%;transform:translateX(-50%);max-height:34px;max-width:52px;object-fit:contain;opacity:.9">${stl}</div>`:`<div class="pvsig">${stl}</div>`}</div>
     </div>
     <div class="pvfoot">${t.verify} ${S.sets.url} · ${footer}</div>
   </div>
@@ -3403,7 +3440,7 @@ async function genPDF(lang,rec=true){
   const c=C[S.course],d=c[lang],t=T[lang];
   const s=S.sets;
   const no=certNo(S.course),name=fullName(),vt=validUntil(d.valid);
-  const trl=trainerLine()||t.sigT, stl=stampLine()||t.stamp;
+  const trl=trainerLine(S.course)||t.sigT, stl=stampLine()||t.stamp;
   const ps=x=>pdfSafe(x||'');
 
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
@@ -3597,6 +3634,14 @@ async function genPDF(lang,rec=true){
     doc.setTextColor(...N);  // dark navy on light bg → readable
     doc.text(lb, sx+sw3/2, sigY+15, {align:'center'});
   });
+  if(S.sets.stampImg){
+    try{
+      const si=new Image();si.src=S.sets.stampImg;
+      const stW=Math.min(sw3-10,26);
+      const stX=MX+2*sw3+(sw3-stW)/2;
+      doc.addImage(si,/data:image\/png/i.test(S.sets.stampImg)?'PNG':'JPEG',stX,sigY-stW-1,stW,stW,'','FAST');
+    }catch(e){}
+  }
 
   // ── FOOTER ───────────────────────────────────────────────────────────
   doc.setFillColor(...N);
@@ -3631,13 +3676,14 @@ function renderHist(){
 function clearH(){if(confirm('Verlauf / History löschen / clear?')){S.hist=[];persist();renderHist();}}
 
 /* ── SETTINGS ── */
-const SF=[['s-co','co'],['s-cui','cui'],['s-reg','reg'],['s-adr','adr'],['s-city','city'],['s-tel','tel'],['s-em1','em1'],['s-em2','em2'],['s-url','url'],['s-tn','tn'],['s-tq','tq'],['s-tr','tr'],['s-sn','sn'],['s-s1','s1'],['s-s2','s2']];
+const SF=[['s-co','co'],['s-cui','cui'],['s-reg','reg'],['s-adr','adr'],['s-city','city'],['s-tel','tel'],['s-em1','em1'],['s-em2','em2'],['s-url','url'],['s-tn','tn'],['s-tq01','tq01'],['s-tq04','tq04'],['s-tq05','tq05'],['s-tq10','tq10'],['s-tr','tr'],['s-sn','sn'],['s-s1','s1'],['s-s2','s2']];
 function loadSetsForm(){
   SF.forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.value=S.sets[k]||'';});
   ['01','04','05','10'].forEach(id=>{
     const se=document.getElementById('sr-'+id);if(se)se.value=S.ser[id]||'';
     const ce=document.getElementById('cnt-'+id);if(ce)ce.value=S.cnt[id]||1;
   });
+  _updateStampPreview(S.sets.stampImg||'');
 }
 function saveSets(){
   SF.forEach(([id,k])=>{const e=document.getElementById(id);if(e)S.sets[k]=e.value;});
@@ -3648,7 +3694,65 @@ function saveSets(){
   persist();
   const t=document.getElementById('stToast');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);
 }
-function resetSets(){if(!confirm('Zurücksetzen / Reset to defaults?'))return;S.sets={...DS};S.ser={...DSER};loadSetsForm();}
+function resetSets(){if(!confirm('Zurücksetzen / Reset to defaults?'))return;S.sets=Object.assign({},DS);S.ser=Object.assign({},DSER);localStorage.removeItem('ss_stamp_img');loadSetsForm();}
+
+function _updateStampPreview(src){
+  const img=document.getElementById('stamp-preview-img');
+  const ph=document.getElementById('stamp-preview-placeholder');
+  if(!img||!ph)return;
+  if(src){img.src=src;img.style.display='';ph.style.display='none';}
+  else{img.src='';img.style.display='none';ph.style.display='';}
+}
+function handleStampUpload(input){
+  const file=input.files[0];if(!file)return;
+  if(file.size>2*1024*1024){alert('Max 2MB');input.value='';return;}
+  const reader=new FileReader();
+  reader.onload=function(e2){
+    S.sets.stampImg=e2.target.result;
+    _updateStampPreview(e2.target.result);
+    persist();
+    const ss=document.getElementById('stamp-sync-status');
+    if(ss){ss.textContent='Sincronizare...';setTimeout(()=>{ss.textContent='Sincronizat pe toate dispozitivele';setTimeout(()=>ss.textContent='',4000);},3500);}
+    const t=document.getElementById('stToast');if(t){t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+  };
+  reader.readAsDataURL(file);
+}
+function clearStampImage(){
+  S.sets.stampImg='';
+  localStorage.removeItem('ss_stamp_img');
+  _updateStampPreview('');
+  const inp=document.getElementById('stamp-file-input');if(inp)inp.value='';
+  persist();
+  const ss=document.getElementById('stamp-sync-status');
+  if(ss){ss.textContent='Stampila stearsa';setTimeout(()=>ss.textContent='',3000);}
+}
+let _settingsSyncTimer=null;
+function _scheduleSettingsSync(){
+  if(typeof _gasConfigured!=='function'||!_gasConfigured())return;
+  clearTimeout(_settingsSyncTimer);
+  _settingsSyncTimer=setTimeout(_pushSettingsToGAS,2000);
+}
+async function _pushSettingsToGAS(){
+  try{
+    const payload={action:'saveCertSettings',settings:JSON.stringify(Object.assign({},S.sets,{stampImg:''})),stampImg:S.sets.stampImg||'',ser:JSON.stringify(S.ser),cnt:JSON.stringify(S.cnt)};
+    const res=await(typeof gasCallPost==='function'?gasCallPost(payload,30000):certGasCall(payload));
+    if(res&&res.ok)console.log('[Settings] Synced OK');
+  }catch(e){if(typeof _gasWarn==='function')_gasWarn('[Settings]',e);}
+}
+async function _pullSettingsFromGAS(){
+  if(typeof _gasConfigured!=='function'||!_gasConfigured())return false;
+  try{
+    const res=await(typeof gasCall==='function'?gasCall({action:'getCertSettings'},12000):certGasCall({action:'getCertSettings'}));
+    if(!res||!res.ok)return false;
+    let changed=false;
+    if(res.settings){try{const r=JSON.parse(res.settings);const m=Object.assign({},DS,r,{stampImg:S.sets.stampImg});if(JSON.stringify(m)!==JSON.stringify(S.sets)){S.sets=m;changed=true;}}catch(e){}}
+    if(typeof res.stampImg==='string'&&res.stampImg!==S.sets.stampImg){S.sets.stampImg=res.stampImg;if(res.stampImg)localStorage.setItem('ss_stamp_img',res.stampImg);else localStorage.removeItem('ss_stamp_img');changed=true;}
+    if(res.ser){try{S.ser=Object.assign({},DSER,JSON.parse(res.ser));}catch(e){}}
+    if(res.cnt){try{S.cnt=Object.assign({},DCNT,JSON.parse(res.cnt));}catch(e){}}
+    if(changed){try{localStorage.setItem('ss3',JSON.stringify({hist:S.hist,sets:Object.assign({},S.sets,{stampImg:''}),ser:S.ser,cnt:S.cnt}));if(S.sets.stampImg)localStorage.setItem('ss_stamp_img',S.sets.stampImg);}catch(e){}if(typeof loadSetsForm==='function')loadSetsForm();if(typeof toast==='function')toast('Setari trainer sincronizate','info');}
+    return changed;
+  }catch(e){if(typeof _gasWarn==='function')_gasWarn('[Settings pull]',e);return false;}
+}
 
 /* ── INIT ── */
 function init(){
@@ -8816,11 +8920,11 @@ async function gasTestConnection() {
 function initDriveOnPageLoad() {
   applyDriveConfigToUI();
   applyGasConfigToUI();
-  // Restore din Sheets la pornire (fără OAuth, fără popup)
   gasRestoreOnLoad().then(restored => {
     if (restored) { renderDashboard(); updateSidebarCounts(); }
+    // Pull cert settings + stamp at startup
+    if(typeof _pullSettingsFromGAS==='function') _pullSettingsFromGAS().catch(()=>{});
   });
-  // Backup JSON zilnic la pornire (max o data la 23h)
   _maybeDailyJsonBackup();
 }
 
