@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a4080">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>SicherShield — Platform</title>
+<title>SicherShield — Platform</title>h
 
 <script>
 // ── PWA Manifest via Blob URL (required for Chrome mobile install) ───────────
@@ -3191,11 +3191,7 @@ function _certSyncToGAS() {
       cnt:      JSON.stringify(S.cnt)
     };
     // Fara stampImg la fiecare save — prea mare; stamp se salveaza separat la upload
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).catch(function() {});
+    gasCallPost(payload).catch(function() {});
   } catch(e) {}
 }
 
@@ -3208,12 +3204,7 @@ async function _certRestoreFromGAS() {
   try {
     const url = (window._gasUrlOverride || localStorage.getItem('ss_gas_url') || (typeof GAS_URL !== 'undefined' ? GAS_URL : '') || window._GAS_URL || '').trim();
     if (!url || url.includes('INLOCUIESTE')) return;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'getCertSettings' })
-    });
-    const data = await res.json();
+    const data = await gasCallPost({ action: 'getCertSettings' });
     if (!data || !data.ok) return;
     // Aplica setarile din GAS
     if (data.settings) { try { const s = JSON.parse(data.settings); S.sets = { ...DS, ...s }; } catch(e) {} }
@@ -5659,12 +5650,7 @@ async function _ppeLoadFromGAS() {
                  (typeof GAS_URL !== 'undefined' ? GAS_URL : '') || window._GAS_URL || '').trim();
     if (!url || url.includes('INLOCUIESTE')) return;
 
-    const res  = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'getAll' })
-    });
-    const data = await res.json();
+    const data = await gasCallPost({ action: 'getAll' });
     if (!data || !data.ok) return;
 
     db.equipment   = data.equipment   || [];
