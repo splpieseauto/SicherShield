@@ -3174,10 +3174,8 @@ const DCNT={'01':1,'04':1,'05':1,'10':1};
 /* ── STATE ── */
 let S={step:0,fn:'',ln:'',date:'',pos:'',co2:'',dept:'',course:null,langs:[],hist:[],sets:{...DS},ser:{...DSER},cnt:{...DCNT}};
 
-/* ── PERSIST — GAS-FIRST, localStorage doar cache offline ── */
+/* ── PERSIST — GAS-ONLY, fara localStorage ── */
 function persist() {
-  // Salveaza in localStorage doar ca backup offline
-  try { localStorage.setItem('ss3', JSON.stringify({ hist: S.hist, sets: S.sets, ser: S.ser, cnt: S.cnt })); } catch(e) {}
   // Sync async spre GAS (fara await — fire-and-forget)
   _certSyncToGAS();
 }
@@ -3202,28 +3200,7 @@ function _certSyncToGAS() {
 }
 
 function restore() {
-  // Citim din localStorage ca fallback rapid (se suprascrie dupa ce GAS raspunde)
-  try {
-    const d = JSON.parse(localStorage.getItem('ss3') || '{}');
-    if (d.hist) S.hist = d.hist;
-    if (d.sets) S.sets = { ...DS, ...d.sets };
-    if (d.ser)  S.ser  = { ...DSER, ...d.ser };
-    if (d.cnt)  S.cnt  = { ...DCNT, ...d.cnt };
-  } catch(e) {}
-  // Incarca stamp din localStorage rapid
-  try {
-    const _si = localStorage.getItem('ss_stamp_img');
-    if (_si) {
-      S.sets.stampImg = _si;
-      setTimeout(function() {
-        const img  = document.getElementById('stamp-preview-img');
-        const wrap = document.getElementById('stamp-preview-wrap');
-        const lbl  = document.getElementById('stamp-drop-label');
-        if (img) { img.src = _si; if (wrap) wrap.style.display = 'block'; if (lbl) lbl.textContent = '✓ (gespeichert / salvat)'; }
-      }, 300);
-    }
-  } catch(e) {}
-  // Fetch GAS in background — suprascrie datele locale cu cele din cloud
+  // Fetch GAS — singura sursa de adevar pentru sets/ser/cnt/stamp
   _certRestoreFromGAS();
 }
 
@@ -3245,7 +3222,6 @@ async function _certRestoreFromGAS() {
     // Stamp imagine
     if (data.stampImg && data.stampImg.length > 10) {
       S.sets.stampImg = data.stampImg;
-      try { localStorage.setItem('ss_stamp_img', data.stampImg); } catch(e) {}
       setTimeout(function() {
         const img  = document.getElementById('stamp-preview-img');
         const wrap = document.getElementById('stamp-preview-wrap');
@@ -3255,8 +3231,6 @@ async function _certRestoreFromGAS() {
     }
     // Refresh form daca e deschis
     if (typeof loadSetsForm === 'function') { try { loadSetsForm(); } catch(e) {} }
-    // Persist local
-    try { localStorage.setItem('ss3', JSON.stringify({ hist: S.hist, sets: S.sets, ser: S.ser, cnt: S.cnt })); } catch(e) {}
   } catch(e) { console.warn('[CertGAS] restore failed:', e); }
 }
 
@@ -3347,7 +3321,6 @@ function loadStampImg(inp){
   r.onload=function(e){
     const b64=e.target.result;
     S.sets.stampImg=b64;
-    localStorage.setItem('ss_stamp_img',b64);
     // Trimite stamp si spre GAS
     try {
       const _surl = (window._gasUrlOverride || localStorage.getItem('ss_gas_url') || (typeof GAS_URL !== 'undefined' ? GAS_URL : '') || window._GAS_URL || '').trim();
@@ -3367,7 +3340,6 @@ function loadStampImg(inp){
 }
 function clearStampImg(){
   S.sets.stampImg='';
-  localStorage.removeItem('ss_stamp_img');
   // Sterge stamp si din GAS
   try {
     const _surl = (window._gasUrlOverride || localStorage.getItem('ss_gas_url') || (typeof GAS_URL !== 'undefined' ? GAS_URL : '') || window._GAS_URL || '').trim();
