@@ -353,6 +353,23 @@ select option{background:var(--navy3)}
     </div>
   </div>
 
+  <div class="sc">
+    <h3>☁️ Google Drive Sync (Apps Script)</h3>
+    <div class="sg2">
+      <div class="fg" style="grid-column:1/-1">
+        <label>Web App URL (Google Apps Script)</label>
+        <input type="text" id="s-gas" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+      </div>
+    </div>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.5rem;align-items:center">
+      <button class="sbtn g" onclick="gasTestConnection()">🔌 Verbindung testen / Test Connection</button>
+      <button class="sbtn g" onclick="gasBackupSettings(true)">⬆ Einstellungen jetzt sichern / Backup now</button>
+      <button class="sbtn g" onclick="gasRestoreSettings()">⬇ Wiederherstellen / Restore</button>
+      <button class="sbtn g" onclick="gasFetchHistory()">📜 Verlauf laden / Load history</button>
+      <span id="gasStatus" style="font-size:12px;color:var(--gray)"></span>
+    </div>
+  </div>
+
   <div class="save-row">
     <button class="sbtn" onclick="saveSets()">✓ Einstellungen speichern / Save Settings</button>
     <button class="sbtn g" onclick="resetSets()">↩ Zurücksetzen / Reset</button>
@@ -826,12 +843,21 @@ async function genPDF(lang,rec=true){
   // Save
   const fname=ps(no)+'_'+ps(name).replace(/\s+/g,'_')+'_'+lang+'.pdf';
   doc.save(fname);
+  const _pdfB64 = doc.output('datauristring');
 
   if(rec){
     S.cnt[S.course]=(S.cnt[S.course]||1)+1;
     S.hist.unshift({no:certNo(S.course),name:fullName(),course:C[S.course].DE.title,
       langs:lang,type:'cert',date:fmt(S.date),id:S.course});
     persist(); updCnt();
+    gasSaveCertificate({
+      certNo: no, firstName: S.fn, lastName: S.ln, position: S.pos,
+      company: S.co2, department: S.dept, courseId: S.course,
+      courseTitle: C[S.course].DE.title, norm: d.norm, duration: d.dur,
+      language: lang, issueDate: S.date, validUntil: vt,
+      certNumber: no, trainerId: s.tr, company_issuer: s.co,
+      pdfBase64: _pdfB64
+    });
   }
 }
 
@@ -851,6 +877,8 @@ function loadSetsForm(){
     const se=document.getElementById('sr-'+id);if(se)se.value=S.ser[id]||'';
     const ce=document.getElementById('cnt-'+id);if(ce)ce.value=S.cnt[id]||1;
   });
+  const gasEl=document.getElementById('s-gas');
+  if(gasEl){ gasEl.value = localStorage.getItem('ss_gas_url') || ''; }
 }
 function saveSets(){
   SF.forEach(([id,k])=>{const e=document.getElementById(id);if(e)S.sets[k]=e.value;});
@@ -858,14 +886,133 @@ function saveSets(){
     const se=document.getElementById('sr-'+id);if(se)S.ser[id]=se.value;
     const ce=document.getElementById('cnt-'+id);if(ce){const v=parseInt(ce.value);if(v>=1)S.cnt[id]=v;}
   });
+  const gasEl=document.getElementById('s-gas');
+  if(gasEl){ localStorage.setItem('ss_gas_url', gasEl.value.trim()); }
   persist();
   const t=document.getElementById('stToast');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);
+  gasBackupSettings();
 }
 function resetSets(){if(!confirm('Zurücksetzen / Reset to defaults?'))return;S.sets={...DS};S.ser={...DSER};loadSetsForm();}
+
+/* ── GAS SYNC (Google Apps Script / Drive) ── */
+function _gasUrl(){
+  return (localStorage.getItem('ss_gas_url') || '').trim();
+}
+function _gasSetStatus(msg, isErr){
+  const el=document.getElementById('gasStatus');
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = isErr ? '#ff6b6b' : 'var(--gray)';
+}
+function gasCall(params, timeoutMs=15000){
+  const url=_gasUrl();
+  if(!url){ _gasSetStatus('⚠ Keine GAS-URL gesetzt / No GAS URL set', true); return Promise.resolve(null); }
+  const timeoutP=new Promise((_,rej)=>setTimeout(()=>rej(new Error('GAS timeout')), timeoutMs));
+  const payload=encodeURIComponent(JSON.stringify(params));
+  return Promise.race([
+    fetch(url+'?payload='+payload, {method:'GET', redirect:'follow'}),
+    timeoutP
+  ]).then(r=>r.text()).then(txt=>{
+    if(!txt || !txt.trim()) throw new Error('Leere Antwort / Empty response');
+    return JSON.parse(txt);
+  });
+}
+function gasCallPost(params, timeoutMs=20000){
+  const url=_gasUrl();
+  if(!url){ _gasSetStatus('⚠ Keine GAS-URL gesetzt / No GAS URL set', true); return Promise.resolve(null); }
+  const timeoutP=new Promise((_,rej)=>setTimeout(()=>rej(new Error('GAS timeout')), timeoutMs));
+  return Promise.race([
+    fetch(url, {method:'POST', redirect:'follow',
+      headers:{'Content-Type':'text/plain'}, body:JSON.stringify(params)}),
+    timeoutP
+  ]).then(r=>r.text()).then(txt=>{
+    if(!txt || !txt.trim()) throw new Error('Leere Antwort / Empty response');
+    return JSON.parse(txt);
+  });
+}
+function gasTestConnection(){
+  if(!_gasUrl()){ _gasSetStatus('⚠ Bitte zuerst URL eingeben & speichern / Enter & save URL first', true); return; }
+  _gasSetStatus('⏳ Teste Verbindung / Testing…');
+  gasCall({action:'ping'})
+    .then(r=>{
+      if(r && r.ok) _gasSetStatus('✓ Verbunden / Connected ('+(r.ts||'')+')');
+      else _gasSetStatus('✗ Fehler / Error: '+(r&&r.error||'unbekannt/unknown'), true);
+    })
+    .catch(e=>_gasSetStatus('✗ Fehler / Error: '+e.message, true));
+}
+function gasSaveCertificate(data){
+  if(!_gasUrl()) return;
+  _gasSetStatus('⏳ Zertifikat wird gesichert / Saving certificate…');
+  gasCallPost({action:'saveCertificate', ...data})
+    .then(r=>{
+      if(r && r.ok) _gasSetStatus('✓ Zertifikat gesichert / Certificate saved ('+(r.certNo||'')+')');
+      else _gasSetStatus('✗ Speichern fehlgeschlagen / Save failed: '+(r&&r.error||''), true);
+    })
+    .catch(e=>_gasSetStatus('✗ Speichern fehlgeschlagen / Save failed: '+e.message, true));
+}
+function gasBackupSettings(manual){
+  if(!_gasUrl()){ if(manual) _gasSetStatus('⚠ Bitte zuerst URL eingeben & speichern / Enter & save URL first', true); return; }
+  if(manual) _gasSetStatus('⏳ Einstellungen werden gesichert / Backing up settings…');
+  const settingsJson=JSON.stringify({sets:S.sets, ser:S.ser, cnt:S.cnt});
+  gasCallPost({action:'backupSettings', settingsJson})
+    .then(r=>{
+      if(r && r.ok) _gasSetStatus('✓ Einstellungen gesichert / Settings backed up ('+(r.ts||'')+')');
+      else if(manual) _gasSetStatus('✗ Sicherung fehlgeschlagen / Backup failed: '+(r&&r.error||''), true);
+    })
+    .catch(e=>{ if(manual) _gasSetStatus('✗ Sicherung fehlgeschlagen / Backup failed: '+e.message, true); });
+}
+function gasRestoreSettings(){
+  if(!_gasUrl()){ _gasSetStatus('⚠ Bitte zuerst URL eingeben & speichern / Enter & save URL first', true); return; }
+  if(!confirm('Lokale Einstellungen mit Drive-Backup überschreiben?\nOverwrite local settings with Drive backup?')) return;
+  _gasSetStatus('⏳ Wiederherstellen / Restoring…');
+  gasCall({action:'restoreSettings'})
+    .then(r=>{
+      if(r && r.ok && r.settings){
+        if(r.settings.sets) S.sets={...S.sets, ...r.settings.sets};
+        if(r.settings.ser)  S.ser ={...S.ser,  ...r.settings.ser};
+        if(r.settings.cnt)  S.cnt ={...S.cnt,  ...r.settings.cnt};
+        persist();
+        loadSetsForm();
+        _gasSetStatus('✓ Wiederhergestellt / Restored');
+      } else if(r && r.ok){
+        _gasSetStatus('ℹ Kein Backup vorhanden / No backup found');
+      } else {
+        _gasSetStatus('✗ Fehler / Error: '+(r&&r.error||''), true);
+      }
+    })
+    .catch(e=>_gasSetStatus('✗ Fehler / Error: '+e.message, true));
+}
+function gasFetchHistory(){
+  if(!_gasUrl()){ _gasSetStatus('⚠ Bitte zuerst URL eingeben & speichern / Enter & save URL first', true); return; }
+  _gasSetStatus('⏳ Verlauf wird geladen / Loading history…');
+  gasCall({action:'getCertHistory'})
+    .then(r=>{
+      if(r && r.ok){
+        const remote=(r.history||[]).map(x=>({
+          no:x.certNo, name:((x.firstName||'')+' '+(x.lastName||'')).trim(),
+          course:x.courseTitle, langs:x.language, type:'cert', date:x.issueDate, id:x.courseId
+        }));
+        const known=new Set(S.hist.map(h=>h.no+'|'+h.langs+'|'+h.date));
+        let added=0;
+        remote.forEach(x=>{
+          const key=x.no+'|'+x.langs+'|'+x.date;
+          if(!known.has(key)){ S.hist.push(x); known.add(key); added++; }
+        });
+        S.hist.sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+        persist();
+        if(typeof renderHist==='function') renderHist();
+        _gasSetStatus('✓ '+added+' neue Einträge / new entries geladen / loaded');
+      } else {
+        _gasSetStatus('✗ Fehler / Error: '+(r&&r.error||''), true);
+      }
+    })
+    .catch(e=>_gasSetStatus('✗ Fehler / Error: '+e.message, true));
+}
 
 /* ── INIT ── */
 function init(){
   restore();
+  loadSetsForm();
   const today=new Date().toISOString().split('T')[0];
   const dateEl=document.getElementById('inp-date');
   if(dateEl){ dateEl.value=today; }
