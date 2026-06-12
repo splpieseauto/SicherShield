@@ -5676,7 +5676,7 @@ async function _ppeLoadFromGAS() {
 
     const res  = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action: 'getAll' })
     });
     const data = await res.json();
@@ -5735,7 +5735,7 @@ function resetAllData() {
     if (url && !url.includes('INLOCUIESTE')) {
       fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'syncAll', data: JSON.stringify({ equipment: [], inspections: [] }) })
       }).then(function() {
         if (typeof toast === 'function') toast('✓ Date șterse local și din Cloud.', 'success');
@@ -9093,9 +9093,12 @@ let _pwaPrompt = null;
   if (!('serviceWorker' in navigator)) return;
   try {
     const swCode = [
-      "const CACHE='ss-v2';",
+      "const CACHE='ss-v3';",
       "self.addEventListener('install',e=>self.skipWaiting());",
-      "self.addEventListener('activate',e=>{clients.claim();});",
+      "self.addEventListener('activate',e=>{",
+      "  e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));",
+      "  clients.claim();",
+      "});",
       "self.addEventListener('fetch',function(e){",
       "  var req=e.request;",
       "  if(req.method!=='GET')return;",                          
